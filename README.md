@@ -1,11 +1,46 @@
 # UWAGuessr
-*NOTICE!! Please run the following command when running for the first time to import the latest photos:*
-```bash
-flask --app run load-photos
-```
+
+| Student ID | Name                       | Github Account                                               |
+| ---------- | -------------------------- | ------------------------------------------------------------ |
+| 24149137   | Mathew Nedumpurath Tomy    | [mathewtomy973-pixel](https://github.com/mathewtomy973-pixel) |
+| 24465269   | Tep (Vu Minh Hoang) Nguyen | [tepnguyenvu](https://github.com/tepnguyenvu)                |
+| 23831382   | Janee Pandithasekara       | [Janee190](https://github.com/Janee190)                      |
+| 24217857   | Etienne Vinton Horn        | [etienneunai](https://github.com/etienneunai)                |
 
 ## Description
 UWAGuessr is a web-based discovery game inspired by GeoGuessr, focussed specifically on the University of Western Australia (UWA) campus. Players are presented with photos of various locations around UWA and must pinpoint their location on an interactive map.
+
+## Running the Server
+
+Process for first running (we recommend using a virtual environment):
+
+```bash
+pip install -r requirements.txt
+flask db upgrade
+flask --app run load-photos //loads initial photos from data json file
+
+flask run
+```
+
+Users can be promoted to an admin account with the following command:
+
+```bash
+flask --app run admin-promote [USERNAME]
+```
+
+Admins can be demoted with:
+
+```bash
+flask --app run admin-demote [USERNAME]
+```
+
+## Running Tests
+
+```bash
+python -m pytest
+```
+
+# Project Details
 
 ## Project Goals
 * **Engagement:** Create a fun, interactive way for students, alumni, and visitors to explore the UWA campus.
@@ -14,11 +49,12 @@ UWAGuessr is a web-based discovery game inspired by GeoGuessr, focussed specific
 
 ## Key Features
 * **User Authentication:** Secure account creation and login/logout functionality to save progress.
+* **Password Reset:** Secure method to allow users to reset their passwords with a custom security question if they forget.
 * **Interactive Map Guessing:** A map interface allowing players to place markers to submit their guesses.
 * **Scoring & Feedback:** Real-time distance calculation between the guess and the actual location, including visual reveals of the correct spot.
 * **User Profiles:** Dedicated profile pages to track past game history and individual performance metrics.
 * **Global Leaderboard:** A competitive ranking system to compare scores with other players.
-* **Social Challenges:** Ability to share specific game links so friends can compete on the same set of locations.
+* **Social Challenges:** Ability to send friends challenges and play a semi-realtime game using HTTP polling for syncing.
 * **Admin Dashboard:** Tools for system administrators to manage users and for game admins to upload/delete campus photos without writing code.
 
 ## Site Structure
@@ -26,8 +62,10 @@ UWAGuessr is a web-based discovery game inspired by GeoGuessr, focussed specific
 * **Game Page:** The core interactive interface for viewing photos and the map.
 * **Leaderboard:** Ranking of top users.
 * **Profile:** Personal dashboard for game history and stats.
+* **User Pages**: View the profiles and stats of other users.
 * **About/How to Play:** Instructions and project background.
-* **Authentication Pages:** Simple Login and Sign-up forms.
+* **Authentication Pages:** Simple Login, sign-up, and password-reset.
+* **Admin Management Portal:** Allows the upload, deletion, and editing of game photos.
 
 ## Tech Stack
 * **Frontend:** Bootstrap (HTML/CSS)
@@ -35,8 +73,3 @@ UWAGuessr is a web-based discovery game inspired by GeoGuessr, focussed specific
 * **Database:** SQLite (via SQLAlchemy)
 * **Map API:** MazeMap (Mapbox GL-based)
 
-## Networking
-All real-time features use HTTP polling — no WebSockets or SSE. Clients call REST endpoints and poll `/api/challenges/poll/<id>` every 3 seconds for state updates. The server is the single source of truth; each client pulls the latest challenge state rather than receiving pushed events. This keeps the architecture simple and works well for the turn-based game loop without overloading the SQLite backend.
-
-## Challenges
-A `Challenge` row links two players with a shared set of 5 photo IDs and progresses through statuses: `pending` → `ready_waiting` → `in_progress` → `completed`. Both players must click READY before the game begins. During play, scores and round progress sync each round via `/api/challenges/update-progress`. When a player finishes all 5 rounds, `/api/game-complete` marks their round as 6. Once both players reach round 6, the winner is determined by comparing scores, and the game-over screen polls until the result is available.

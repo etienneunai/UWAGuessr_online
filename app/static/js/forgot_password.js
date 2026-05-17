@@ -148,10 +148,15 @@ $(function () {
     $btn.addClass("loading").prop("disabled", true);
     $btn.find(".btn-label").text("Resetting…");
 
+    const csrfToken = $("input[name='csrf_token']").val();
+
     $.ajax({
       url: "/api/forgot-password",
       method: "POST",
       contentType: "application/json",
+      headers: {
+        "X-CSRFToken": csrfToken,
+      },
       data: JSON.stringify({
         email: $("#email").val().trim(),
         securityAnswer: $("#securityAnswer").val().trim(),

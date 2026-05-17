@@ -70,7 +70,7 @@ def api_forgot_password():
 
 @app.route("/api/game-images")
 def api_game_images():
-    from app.game.game_logic import get_game_images
+    from app.game_logic import get_game_images
     from app.models import Challenge
     
     challenge_id = request.args.get('challengeId')
@@ -90,7 +90,7 @@ def api_game_images():
 
 @app.route("/api/guess", methods=["POST"])
 def api_guess():
-    from app.game.game_logic import calculate_score
+    from app.game_logic import calculate_score
     data = request.json
     guess_lat = data.get('lat')
     guess_lng = data.get('lng')

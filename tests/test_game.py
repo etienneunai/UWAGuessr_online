@@ -5,7 +5,7 @@ import pytest
 
 from app import db
 from app.models import User, Photos, Challenge, Friendship, GameResult
-from app.game.game_logic import calculate_score, calculate_haversine, get_game_images
+from app.game_logic import calculate_score, calculate_haversine, get_game_images
 from app.controllers import add_score
 
 from tests.conftest import login_as, _make_user, _make_photo

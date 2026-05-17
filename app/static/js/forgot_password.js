@@ -86,6 +86,9 @@ $(function () {
       url: "/api/get-security-question",
       method: "POST",
       contentType: "application/json",
+      headers: {
+        "X-CSRFToken": $("input[name='csrf_token']").val(),
+      },
       data: JSON.stringify({ email }),
       success: function (response) {
         $("#securityQuestionText").text(response.securityQuestion);

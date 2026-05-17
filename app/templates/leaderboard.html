@@ -49,16 +49,7 @@ render_leaderboard(scores, id, display_style, user_stat) %}
             </tbody>
         </table>
     </div>
-    {% endif %} {% if scores|length >= 3 %}
-    <div class="rank-card rank-3">
-      <div class="bangers-font rank-number" style="color: #cd7f32">#3</div>
-      <div class="fw-bold rank-name">{{ scores[2].username }}</div>
-      <div class="text-muted rank-score">
-        {{ "{:,}".format(scores[2].high_score) }} pts
-      </div>
-    </div>
     {% endif %}
-  </div>
 
     {% if current_user.is_authenticated and user_stat %}
     <div class="sticky-user-row">
@@ -70,7 +61,6 @@ render_leaderboard(scores, id, display_style, user_stat) %}
             <div class="fw-bold fs-4">{{ "{:,}".format(user_stat.score) }} pts</div>
         </div>
     </div>
-  </div>
   {% endif %}
 </div>
 {% endmacro %}
@@ -110,21 +100,6 @@ render_leaderboard(scores, id, display_style, user_stat) %}
   </div>
 </main>
 
-<script>
-  function showLeaderboard(type) {
-    document.getElementById("board-daily").style.display =
-      type === "daily" ? "block" : "none";
-    document.getElementById("board-all-time").style.display =
-      type === "all-time" ? "block" : "none";
-
-    if (type === "daily") {
-      document.getElementById("btn-daily").classList.add("active");
-      document.getElementById("btn-all-time").classList.remove("active");
-    } else {
-      document.getElementById("btn-all-time").classList.add("active");
-      document.getElementById("btn-daily").classList.remove("active");
-    }
-  }
-</script>
+<script src="{{ url_for('static', filename='js/leaderboard.js') }}"></script>
 
 {% endblock %}

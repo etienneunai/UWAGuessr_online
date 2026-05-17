@@ -607,6 +607,7 @@ main {
 }
 
 .rank-1 .rank-number {
+  color: #ffd700;
   font-size: 3.5rem;
 }
 
@@ -622,8 +623,16 @@ main {
   border-color: #c0c0c0;
 }
 
+.rank-2 .rank-number {
+  color: #c0c0c0;
+}
+
 .rank-3 {
   border-color: #cd7f32;
+}
+
+.rank-3 .rank-number {
+  color: #cd7f32;
 }
 
 .rank-number {
@@ -694,6 +703,22 @@ main {
   color: rgba(255, 255, 255, 0.8) !important;
   font: 500 1.15rem/1 var(--font-main);
   letter-spacing: 1px;
+}
+
+.rank-name a,
+.row-name a,
+.sticky-user-row a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.row-name {
+  color: var(--golden);
+}
+
+#board-daily,
+#board-all-time {
+  padding-bottom: 80px;
 }
 
 /* --- Leaderboard Toggle Buttons --- */

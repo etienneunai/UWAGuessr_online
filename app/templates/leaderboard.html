@@ -1,12 +1,12 @@
 {% extends "base.html" %} {% block content %} {% macro
 render_leaderboard(scores, id, display_style, user_stat) %}
-<div id="{{ id }}" style="display: {{ display_style }}; padding-bottom: 80px;">
+<div id="{{ id }}" style="display: {{ display_style }}">
     <div class="top-three">
         {% if scores|length >= 1 %}
         <div class="rank-card rank-1">
-            <div class="bangers-font rank-number" style="color: #ffd700;">#1</div>
+            <div class="bangers-font rank-number">#1</div>
             <div class="fw-bold rank-name">
-                <a href="/user/{{ scores[0].username }}" style="color:inherit;text-decoration:none;">{{ scores[0].username }}</a>
+                <a href="/user/{{ scores[0].username }}">{{ scores[0].username }}</a>
             </div>
             <div class="text-muted rank-score">{{ "{:,}".format(scores[0].high_score) }} pts</div>
         </div>
@@ -14,9 +14,9 @@ render_leaderboard(scores, id, display_style, user_stat) %}
 
         {% if scores|length >= 2 %}
         <div class="rank-card rank-2">
-            <div class="bangers-font rank-number" style="color: #c0c0c0;">#2</div>
+            <div class="bangers-font rank-number">#2</div>
             <div class="fw-bold rank-name">
-                <a href="/user/{{ scores[1].username }}" style="color:inherit;text-decoration:none;">{{ scores[1].username }}</a>
+                <a href="/user/{{ scores[1].username }}">{{ scores[1].username }}</a>
             </div>
             <div class="text-muted rank-score">{{ "{:,}".format(scores[1].high_score) }} pts</div>
         </div>
@@ -24,9 +24,9 @@ render_leaderboard(scores, id, display_style, user_stat) %}
 
         {% if scores|length >= 3 %}
         <div class="rank-card rank-3">
-            <div class="bangers-font rank-number" style="color: #cd7f32;">#3</div>
+            <div class="bangers-font rank-number">#3</div>
             <div class="fw-bold rank-name">
-                <a href="/user/{{ scores[2].username }}" style="color:inherit;text-decoration:none;">{{ scores[2].username }}</a>
+                <a href="/user/{{ scores[2].username }}">{{ scores[2].username }}</a>
             </div>
             <div class="text-muted rank-score">{{ "{:,}".format(scores[2].high_score) }} pts</div>
         </div>
@@ -40,8 +40,8 @@ render_leaderboard(scores, id, display_style, user_stat) %}
                 {% for score in scores[3:] %}
                 <tr>
                     <td class="ps-4 fw-bold row-rank">#{{ loop.index + 3 }}</td>
-                    <td class="fw-bold row-name" style="color: var(--golden);">
-                        <a href="/user/{{ score.username }}" style="color:inherit;text-decoration:none;">{{ score.username }}</a>
+                    <td class="fw-bold row-name">
+                        <a href="/user/{{ score.username }}">{{ score.username }}</a>
                     </td>
                     <td class="text-end pe-4 row-score">{{ "{:,}".format(score.high_score) }} pts</td>
                 </tr>
@@ -56,7 +56,7 @@ render_leaderboard(scores, id, display_style, user_stat) %}
         <div class="container d-flex justify-content-between align-items-center">
             <div class="fw-bold fs-4">#{{ user_stat.rank }}</div>
             <div class="fw-bold fs-4">
-                <a href="/user/{{ current_user.username }}" style="color:inherit;text-decoration:none;">{{ current_user.username }}</a>
+                <a href="/user/{{ current_user.username }}">{{ current_user.username }}</a>
             </div>
             <div class="fw-bold fs-4">{{ "{:,}".format(user_stat.score) }} pts</div>
         </div>

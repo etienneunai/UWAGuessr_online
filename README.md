@@ -38,6 +38,10 @@ flask --app run admin-demote [USERNAME]
 
 ```bash
 python -m pytest
+```  
+To run a test file individually:  
+```bash
+python -m pytest tests/test.py
 ```
 
 # Project Details

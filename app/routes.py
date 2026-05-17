@@ -26,7 +26,7 @@ def api_register():
     if errors:
         return jsonify({'errors': errors}), 400
     login_user(user)
-    return jsonify({'message': 'Signup successful'}), 201
+    return jsonify({'redirect': url_for('index')}), 201
 
 
 @app.route("/login")

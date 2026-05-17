@@ -6,8 +6,8 @@ from werkzeug.utils import secure_filename
 from flask_login import login_user, login_required, logout_user, current_user
 
 from app import app
-from app.models import Friendship, User
-from app.image_upload import extract_gps, convert_to_webp, add_photo_record
+from app.models import Friendship, User, Photos
+from app.image_upload import extract_gps, convert_to_webp, add_photo_record, delete_photo_record, update_photo_location
 
 from app.controllers import login_user_service, register_user, change_user_password, get_leaderboard_data, get_all_time_leaderboard_data, add_score, get_user_daily_stat, get_user_all_time_stat
 
@@ -381,6 +381,50 @@ def api_confirm_image():
         'lat': lat,
         'lng': lng,
     })
+
+@app.route("/api/photos")
+def api_list_photos():
+    """List all photos in the database."""
+    photos = Photos.query.order_by(Photos.pid.desc()).all()
+    return jsonify([{
+        'pid': p.pid,
+        'image_path': p.image_path,
+        'latitude': p.latitude,
+        'longitude': p.longitude,
+        'timestamp': p.timestamp.isoformat() if p.timestamp else None,
+    } for p in photos])
+
+
+@app.route("/api/photos/<int:pid>/update-location", methods=["POST"])
+def api_update_photo_location(pid):
+    """Update the latitude and longitude of an existing photo."""
+    data = request.json
+    lat = data.get('lat')
+    lng = data.get('lng')
+
+    if lat is None or lng is None:
+        return jsonify({'error': 'Missing lat or lng'}), 400
+
+    try:
+        lat = float(lat)
+        lng = float(lng)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Invalid coordinates'}), 400
+
+    if not update_photo_location(pid, lat, lng):
+        return jsonify({'error': 'Photo not found'}), 404
+
+    return jsonify({'success': True})
+
+
+@app.route("/api/photos/<int:pid>/delete", methods=["POST"])
+def api_delete_photo(pid):
+    """Delete a photo from the database and disk."""
+    if not delete_photo_record(pid):
+        return jsonify({'error': 'Photo not found'}), 404
+
+    return jsonify({'success': True})
+
 
 # ── Challenges ──────────────────────────────────────────────────────────
 

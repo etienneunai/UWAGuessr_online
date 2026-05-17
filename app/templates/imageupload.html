@@ -50,6 +50,15 @@
         <div class="queue-list" id="queue-list"></div>
       </div>
 
+      <!-- ===== EXISTING IMAGES PANEL ===== -->
+      <div id="existing-panel" class="queue-panel">
+        <div class="queue-header">
+          <h3 class="orbitron-font">Existing Images</h3>
+          <span class="queue-counter" id="existing-counter">0 images</span>
+        </div>
+        <div class="queue-list" id="existing-list"></div>
+      </div>
+
       <!-- ===== EDITOR PANEL ===== -->
       <div id="editor-panel" class="editor-panel">
 
@@ -86,6 +95,7 @@
           <button id="save-btn" class="btn btn-warning btn-game bangers-font px-4">Save &amp; Next</button>
           <button id="skip-btn" class="btn btn-outline-light btn-game bangers-font">Skip</button>
           <button id="cancel-btn" class="btn btn-outline-light btn-game bangers-font">Cancel All</button>
+          <button id="delete-btn" class="btn btn-outline-danger btn-game bangers-font" style="display:none;">Delete Photo</button>
           <span id="queue-remaining" class="text-light opacity-75 small ms-2"></span>
         </div>
 

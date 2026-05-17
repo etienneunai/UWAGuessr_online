@@ -10,6 +10,24 @@
 ## Description
 UWAGuessr is a web-based discovery game inspired by GeoGuessr, focussed specifically on the University of Western Australia (UWA) campus. Players are presented with photos of various locations around UWA and must pinpoint their location on an interactive map.
 
+## Configuration
+
+Set the required environment variables before running the server:
+
+**Windows (PowerShell):**
+```powershell
+$env:UWAGUESSR_SECRET_KEY = "your-secret-key-here"
+$env:DATABASE_URL = "sqlite:///app.db"
+```
+
+**macOS / Linux:**
+```bash
+export UWAGUESSR_SECRET_KEY="your-secret-key-here"
+export DATABASE_URL="sqlite:///app.db"
+```
+
+`UWAGUESSR_SECRET_KEY` is required (the app will not start without it). `DATABASE_URL` defaults to `sqlite:///app.db` if not set.
+
 ## Running the Server
 
 Process for first running (we recommend using a virtual environment):
@@ -17,7 +35,7 @@ Process for first running (we recommend using a virtual environment):
 ```bash
 pip install -r requirements.txt
 flask db upgrade
-flask --app run load-photos //loads initial photos from data json file
+flask --app run load-photos # loads initial photos from data json file
 
 flask run
 ```
@@ -41,7 +59,11 @@ python -m pytest
 ```  
 To run a test file individually:  
 ```bash
-python -m pytest tests/test.py
+python -m pytest tests/test_game.py
+python -m pytest tests/test_authentication.py
+python -m pytest tests/test_routes.py
+python -m pytest tests/test_selenium.py
+python -m pytest tests/test_selenium_auth.py
 ```
 
 # Project Details

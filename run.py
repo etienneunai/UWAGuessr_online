@@ -62,4 +62,4 @@ def admin_demote(username):
     print(f"{username} has been demoted from admin")
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run()

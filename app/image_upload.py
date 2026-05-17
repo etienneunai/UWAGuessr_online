@@ -88,6 +88,38 @@ def convert_to_webp(source_path, quality=85):
 
 # ── DB update ─────────────────────────────────────────────────────────────
 
+def delete_photo_record(pid):
+    """Delete a photo row and its file on disk, then re-sync JSON."""
+    from app.models import Photos
+    photo = Photos.query.get(pid)
+    if not photo:
+        return False
+
+    # Remove file from disk
+    file_path = os.path.join(BASE_DIR, photo.image_path.lstrip('/'))
+    if os.path.isfile(file_path):
+        os.remove(file_path)
+
+    db.session.delete(photo)
+    db.session.commit()
+    sync_photos_to_json()
+    return True
+
+
+def update_photo_location(pid, lat, lng):
+    """Update lat/lng for a photo, then re-sync JSON."""
+    from app.models import Photos
+    photo = Photos.query.get(pid)
+    if not photo:
+        return False
+
+    photo.latitude = float(lat)
+    photo.longitude = float(lng)
+    db.session.commit()
+    sync_photos_to_json()
+    return True
+
+
 def add_photo_record(image_path, lat, lng):
     """Insert a new location entry and return the new id."""
     photo = Photos(

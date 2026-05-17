@@ -21,6 +21,7 @@ let isSubmitting = false;
 
 function getCSRFToken() {
     return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+}
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function setActionState(btn, action, text) {
@@ -322,6 +323,11 @@ async function handleStartClick() {
 
 // Resets game state and starts the first round.
 async function startGame() {
+    // Show overlay immediately — API calls and map init happen behind it
+    var overlay = document.getElementById('game-start-overlay');
+    overlay.style.display = 'flex';
+    document.getElementById('game-board').style.display = 'block';
+
     var challengeResult = await initChallenge();
     if (challengeResult === 'completed') return; // already finished — don't reinitialise
 
@@ -339,21 +345,16 @@ async function startGame() {
     activeRounds = images;
 
     if (challengeId) {
-        var overlay = document.getElementById('game-start-overlay');
-        overlay.style.display = 'flex';
         setupPhotoViewer();
         var spinner = document.getElementById('map-spinner');
         if (spinner) spinner.style.display = '';
         initMap();
+        loadPanorama(activeRounds[0].imagePath);
         return;
     }
 
-    document.getElementById('game-board').style.display = 'block';
     document.getElementById('game-over').style.display = 'none';
-
-    var overlay = document.getElementById('game-start-overlay');
     overlay.classList.remove('ready');
-    overlay.style.display = 'flex';
 
     setupPhotoViewer();
 

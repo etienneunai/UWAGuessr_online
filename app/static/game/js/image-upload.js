@@ -12,6 +12,9 @@ let panoViewer = null;
 let fileQueue = [];
 let currentIdx = -1;    // Index of item currently shown in editor
 let savingIds = new Set();   // Prevent double-save per item
+let existingPhotos = [];     // Photos already in the database
+let editingExistingPid = null; // pid when editing existing photo, null = queue mode
+let editingExistingCoords = null; // {lat, lng} cached coords for existing photo being edited
 
 const UWA_CAMPUS_ID = 119;
 
@@ -89,11 +92,16 @@ function placeMarker(lat, lng) {
 
         locationMarker.on('dragend', function () {
             var pos = locationMarker.getLngLat();
-            var item = fileQueue[currentIdx];
-            if (item) {
-                item.lat = pos.lat;
-                item.lng = pos.lng;
+            if (editingExistingPid !== null) {
+                editingExistingCoords = { lat: pos.lat, lng: pos.lng };
                 updateCoordDisplay(pos.lat, pos.lng);
+            } else {
+                var item = fileQueue[currentIdx];
+                if (item) {
+                    item.lat = pos.lat;
+                    item.lng = pos.lng;
+                    updateCoordDisplay(pos.lat, pos.lng);
+                }
             }
         });
     } else {
@@ -102,9 +110,13 @@ function placeMarker(lat, lng) {
             .addTo(uploadMap);
     }
 
-    // Update coords on the current item
-    var item = fileQueue[currentIdx];
-    if (item) { item.lat = lat; item.lng = lng; }
+    // Update coords on the current item or existing photo
+    if (editingExistingPid !== null) {
+        editingExistingCoords = { lat: lat, lng: lng };
+    } else {
+        var item = fileQueue[currentIdx];
+        if (item) { item.lat = lat; item.lng = lng; }
+    }
     updateCoordDisplay(lat, lng);
 }
 
@@ -281,6 +293,201 @@ function destroyEditor() {
     if (uploadMap) { uploadMap.remove(); uploadMap = null; locationMarker = null; }
     document.getElementById('pano-preview').style.display = 'none';
     document.getElementById('editor-panel').style.display = 'none';
+    document.getElementById('delete-btn').style.display = 'none';
+    editingExistingPid = null;
+    editingExistingCoords = null;
+}
+
+// ── Existing database photos ──────────────────────────────────────────────
+
+function loadExistingPhotos() {
+    // Show panel with loading state immediately
+    var panel = document.getElementById('existing-panel');
+    if (panel) panel.style.display = 'block';
+    var list = document.getElementById('existing-list');
+    if (list) list.innerHTML = '<div class="queue-item"><span class="queue-item-name text-light opacity-50">Loading…</span></div>';
+
+    fetch('/api/photos')
+        .then(function (resp) {
+            if (!resp.ok) throw new Error('Server returned ' + resp.status);
+            return resp.json();
+        })
+        .then(function (data) {
+            existingPhotos = data;
+            renderExistingList();
+        })
+        .catch(function (err) {
+            existingPhotos = [];
+            renderExistingList();
+            var list = document.getElementById('existing-list');
+            if (list) list.innerHTML = '<div class="queue-item"><span class="queue-item-name text-danger">Failed to load images: ' + err.message + '</span></div>';
+            var counter = document.getElementById('existing-counter');
+            if (counter) counter.textContent = 'Error';
+        });
+}
+
+function renderExistingList() {
+    var list = document.getElementById('existing-list');
+    var counter = document.getElementById('existing-counter');
+    var panel = document.getElementById('existing-panel');
+    if (!list || !panel) return;
+
+    panel.style.display = 'block';
+    if (counter) counter.textContent = existingPhotos.length + ' image' + (existingPhotos.length !== 1 ? 's' : '');
+
+    if (existingPhotos.length === 0) {
+        list.innerHTML = '<div class="queue-item"><span class="queue-item-name text-light opacity-50">No images in database yet.</span></div>';
+        return;
+    }
+
+    list.innerHTML = '';
+    existingPhotos.forEach(function (photo) {
+        var div = document.createElement('div');
+        div.className = 'queue-item';
+        if (editingExistingPid === photo.pid) div.classList.add('active');
+
+        var num = document.createElement('span');
+        num.className = 'queue-item-number';
+        num.textContent = '#' + photo.pid;
+        div.appendChild(num);
+
+        var name = document.createElement('span');
+        name.className = 'queue-item-name';
+        var displayName = photo.image_path.split('/').pop();
+        name.title = photo.image_path;
+        name.textContent = displayName;
+        div.appendChild(name);
+
+        var coordsEl = document.createElement('span');
+        coordsEl.className = 'queue-item-status';
+        coordsEl.innerHTML = '<span class="badge" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.6);">' +
+            photo.latitude.toFixed(4) + ', ' + photo.longitude.toFixed(4) + '</span>';
+        div.appendChild(coordsEl);
+
+        if (editingExistingPid !== photo.pid) {
+            var editBtn = document.createElement('button');
+            editBtn.className = 'queue-item-action-btn';
+            editBtn.textContent = 'Edit';
+            editBtn.addEventListener('click', function () { openExistingInEditor(photo.pid); });
+            div.appendChild(editBtn);
+
+            var delBtn = document.createElement('button');
+            delBtn.className = 'queue-item-action-btn remove-btn';
+            delBtn.textContent = 'Delete';
+            delBtn.addEventListener('click', function () { deleteExistingPhoto(photo.pid); });
+            div.appendChild(delBtn);
+        }
+
+        list.appendChild(div);
+    });
+}
+
+function openExistingInEditor(pid) {
+    var photo = null;
+    for (var i = 0; i < existingPhotos.length; i++) {
+        if (existingPhotos[i].pid === pid) { photo = existingPhotos[i]; break; }
+    }
+    if (!photo) return;
+
+    editingExistingPid = pid;
+    editingExistingCoords = { lat: photo.latitude, lng: photo.longitude };
+    currentIdx = -1;
+
+    document.getElementById('editor-panel').style.display = 'block';
+    document.getElementById('upload-panel').style.display = 'none';
+    document.getElementById('queue-panel').style.display = 'none';
+    var existingPanel = document.getElementById('existing-panel');
+    if (existingPanel) existingPanel.style.display = 'none';
+
+    var displayName = photo.image_path.split('/').pop();
+    document.getElementById('file-name').textContent = '#' + pid + ' ' + displayName;
+    document.getElementById('editor-queue-badge').textContent = 'Existing';
+
+    updateCoordDisplay(photo.latitude, photo.longitude);
+
+    var deleteBtn = document.getElementById('delete-btn');
+    deleteBtn.style.display = 'inline-block';
+
+    var saveBtn = document.getElementById('save-btn');
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Update Location';
+    saveBtn.classList.remove('btn-warning');
+    saveBtn.classList.add('btn-success');
+
+    var skipBtn = document.getElementById('skip-btn');
+    skipBtn.textContent = 'Close';
+
+    document.getElementById('queue-remaining').textContent = '';
+
+    showPanoramaPreview(photo.image_path);
+    setTimeout(function () { initUploadMap(photo.latitude, photo.longitude); }, 300);
+    setStatus('Drag the pin to adjust, then click "Update Location".', false);
+
+    renderQueue();
+}
+
+function updateExistingLocation() {
+    var pid = editingExistingPid;
+    if (pid === null || !editingExistingCoords) return;
+
+    var saveBtn = document.getElementById('save-btn');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Updating…';
+
+    fetch('/api/photos/' + pid + '/update-location', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+        body: JSON.stringify({
+            lat: editingExistingCoords.lat,
+            lng: editingExistingCoords.lng,
+        }),
+    })
+        .then(function (resp) { return resp.json(); })
+        .then(function (data) {
+            if (data.error) throw new Error(data.error);
+            // Update local cache
+            for (var i = 0; i < existingPhotos.length; i++) {
+                if (existingPhotos[i].pid === pid) {
+                    existingPhotos[i].latitude = editingExistingCoords.lat;
+                    existingPhotos[i].longitude = editingExistingCoords.lng;
+                    break;
+                }
+            }
+            setStatus('Location updated for #' + pid + '.', false);
+            destroyEditor();
+            renderExistingList();
+            document.getElementById('existing-panel').style.display = 'block';
+            document.getElementById('editor-panel').style.display = 'none';
+        })
+        .catch(function (err) {
+            setStatus('Update failed: ' + err.message, true);
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Update Location';
+        });
+}
+
+function deleteExistingPhoto(pid) {
+    if (!confirm('Delete photo #' + pid + ' permanently? This removes it from the database and disk.')) return;
+
+    fetch('/api/photos/' + pid + '/delete', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCSRFToken() },
+    })
+        .then(function (resp) { return resp.json(); })
+        .then(function (data) {
+            if (data.error) throw new Error(data.error);
+            existingPhotos = existingPhotos.filter(function (p) { return p.pid !== pid; });
+            if (editingExistingPid === pid) {
+                destroyEditor();
+                document.getElementById('editor-panel').style.display = 'none';
+                document.getElementById('existing-panel').style.display = 'block';
+            }
+            renderExistingList();
+            setStatus('Photo #' + pid + ' deleted.', false);
+        })
+        .catch(function (err) {
+            setStatus('Delete failed: ' + err.message, true);
+        });
 }
 
 // ── Open item in editor ──────────────────────────────────────────────────
@@ -289,9 +496,14 @@ function openInEditor(idx) {
     var item = fileQueue[idx];
     if (!item || (item.status !== 'ready' && item.status !== 'error')) return;
 
+    editingExistingPid = null;
+    editingExistingCoords = null;
     currentIdx = idx;
+
     document.getElementById('editor-panel').style.display = 'block';
     document.getElementById('upload-panel').style.display = 'none';
+    document.getElementById('existing-panel').style.display = 'none';
+    document.getElementById('delete-btn').style.display = 'none';
     document.getElementById('file-name').textContent = item.originalName;
     updateCoordDisplay(item.lat, item.lng);
     renderQueue();
@@ -304,6 +516,9 @@ function openInEditor(idx) {
     saveBtn.textContent = 'Save & Next';
     saveBtn.classList.remove('btn-success');
     saveBtn.classList.add('btn-warning');
+
+    var skipBtn = document.getElementById('skip-btn');
+    skipBtn.textContent = 'Skip';
 
     setTimeout(function () { initUploadMap(item.lat, item.lng); }, 300);
     if (item.status === 'error' && item.errorMsg) {
@@ -497,8 +712,15 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // ── Save & Next ──
+    // ── Save / Update Location ──
     saveBtn.addEventListener('click', async function () {
+        // Existing photo mode
+        if (editingExistingPid !== null) {
+            updateExistingLocation();
+            return;
+        }
+
+        // Queue mode
         var item = fileQueue[currentIdx];
         if (!item || item.status !== 'ready') return;
 
@@ -539,8 +761,19 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // ── Skip ──
+    // ── Skip / Close ──
     skipBtn.addEventListener('click', function () {
+        // Existing photo mode — just close the editor
+        if (editingExistingPid !== null) {
+            destroyEditor();
+            document.getElementById('existing-panel').style.display = 'block';
+            document.getElementById('editor-panel').style.display = 'none';
+            renderExistingList();
+            setStatus('');
+            return;
+        }
+
+        // Queue mode
         var item = fileQueue[currentIdx];
         if (!item) return;
         destroyEditor();
@@ -561,9 +794,24 @@ document.addEventListener('DOMContentLoaded', function () {
     cancelBtn.addEventListener('click', function () {
         destroyEditor();
         document.getElementById('upload-panel').style.display = 'block';
+        document.getElementById('existing-panel').style.display = 'block';
         fileQueue = [];
         currentIdx = -1;
+        editingExistingPid = null;
+        editingExistingCoords = null;
         renderQueue();
+        renderExistingList();
         setStatus('');
     });
+
+    // ── Delete existing photo ──
+    var deleteBtn = document.getElementById('delete-btn');
+    deleteBtn.addEventListener('click', function () {
+        if (editingExistingPid !== null) {
+            deleteExistingPhoto(editingExistingPid);
+        }
+    });
+
+    // ── Load existing photos on page load ──
+    loadExistingPhotos();
 });

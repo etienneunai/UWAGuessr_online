@@ -522,6 +522,7 @@ main {
 .hero-section {
   align-items: center;
   background-attachment: fixed;
+  background-color: #080c1e;
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;

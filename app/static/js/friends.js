@@ -1,4 +1,6 @@
 $(function () {
+    let friendReqCount = 0;
+    let chalReqCount = 0;
 
     function getCSRFToken() {
         return $('meta[name="csrf-token"]').attr('content');
@@ -12,6 +14,9 @@ $(function () {
         ).then(function (friendsRes, challengesRes) {
             const friends = friendsRes[0];
             const challenges = challengesRes[0];
+            
+            chalReqCount = challenges.filter(c => c.challenged_id == window.current_user_id && c.status === 'pending').length;
+            updateBadges();
             
             const section = $('#friends-list-section');
             section.find('.friend-card').remove();
@@ -105,7 +110,8 @@ $(function () {
                 
                 if (requests.length === 0) {
                     section.hide();
-                    updateBadges(0);
+                    friendReqCount = 0;
+                    updateBadges();
                 } else {
                     section.show();
                     requests.forEach(function (r) {
@@ -125,15 +131,16 @@ $(function () {
                             </div>
                         `);
                     });
-                    updateBadges(requests.length);
+                    friendReqCount = requests.length;
+                    updateBadges();
                 }
             }
         });
     }
     
-    function updateBadges(inviteCount) {
+    function updateBadges() {
         const toggleBadge = $('#friends-toggle-badge');
-        const total = inviteCount || 0;
+        const total = friendReqCount + chalReqCount;
 
         if (total > 0) {
             toggleBadge.text(total > 9 ? '9+' : total).show();

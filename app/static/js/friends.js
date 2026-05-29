@@ -243,10 +243,6 @@ $(function () {
         });
     });
 
-    // ── Add Friend button (focuses search) ────────────────────────────
-    $('#friends-add').on('click', function () {
-        $('#friends-search').focus();
-    });
 
     // ── Challenge Logic ──────────────────────────────────────────────
     $(document).on('click', '.challenge-invite-btn', function () {

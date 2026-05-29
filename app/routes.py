@@ -99,8 +99,8 @@ def api_start_round():
     
     if 'round_starts' not in session:
         session['round_starts'] = {}
-    
-    session['round_starts'][str(img_id)] = datetime.utcnow().isoformat()
+
+    session['round_starts'].setdefault(str(img_id), datetime.utcnow().isoformat())
     session.modified = True
     return jsonify({'success': True})
 
@@ -120,12 +120,18 @@ def api_guess():
         return jsonify({'error': 'Missing required fields'}), 400
         
     # Server-Side Timer Validation
-    if 'round_starts' in session and str(img_id) in session['round_starts']:
-        start_time_str = session['round_starts'][str(img_id)]
+    start_time_str = (session.get('round_starts') or {}).get(str(img_id))
+    if not start_time_str:
+        return jsonify({'error': 'Round not started'}), 400
+
+    try:
         start_time = datetime.fromisoformat(start_time_str)
-        elapsed = (datetime.utcnow() - start_time).total_seconds()
-        if elapsed > 22.0:
-            return jsonify({'error': 'Time limit exceeded'}), 400
+    except ValueError:
+        return jsonify({'error': 'Invalid round start time'}), 400
+
+    elapsed = (datetime.utcnow() - start_time).total_seconds()
+    if elapsed > 22.0:
+        return jsonify({'error': 'Time limit exceeded'}), 400
             
     # Photo Integrity Verification
     if challenge_id:
@@ -698,7 +704,7 @@ def api_challenge_progress():
         'user_id': current_user.uid,
         'round': round_num,
         'score': score
-    }, room=f"challenge_{challenge.id}")
+    }, room=f"challenge_{challenge.id}", include_self=False)
     
     return jsonify({'success': True})
 
@@ -914,7 +920,7 @@ def api_respond_friend_request():
 def api_remove_friend():
     from app.models import Friendship
     from app import db
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     friend_uid = data.get('uid')
 
     if not friend_uid:

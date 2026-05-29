@@ -899,6 +899,8 @@ if (playAgainBtn) {
                 .then(data => {
                     if (data.redirect) {
                         window.location.href = data.redirect;
+                    } else if (data.challenge_id) {
+                        window.location.href = `/game?challengeId=${data.challenge_id}`;
                     } else {
                         playAgainBtn.disabled = false;
                         playAgainBtn.innerText = 'Play Again';

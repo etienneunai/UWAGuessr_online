@@ -202,6 +202,7 @@ function getChallengeIdFromUrl() {
 
 function connectSocket() {
     if (!challengeId) return;
+    if (socket) return;
     
     // Connect to Socket.io server
     socket = io();

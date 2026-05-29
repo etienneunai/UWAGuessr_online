@@ -61,5 +61,52 @@ def admin_demote(username):
     db.session.commit()
     print(f"{username} has been demoted from admin")
 
+@app.cli.command("migrate-photos-to-r2")
+def migrate_photos_to_r2():
+    """Migrate all registered local photos to Cloudflare R2 bucket"""
+    from app.models import Photos
+    from app.config import Config
+    import os
+    
+    if not Config.R2_ENABLED:
+        print("R2 is not enabled (R2_ENABLED is false). Aborting migration.")
+        return
+
+    from app.r2_storage import upload_photo_bytes
+
+    photos = Photos.query.all()
+    print(f"Starting migration of {len(photos)} photos to Cloudflare R2...")
+
+    success_count = 0
+    skip_count = 0
+    error_count = 0
+
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+
+    for photo in photos:
+        # Canonical key on R2
+        key = photo.image_path.lstrip('/')
+        local_path = os.path.join(base_dir, 'app', key)
+
+        if not os.path.exists(local_path):
+            print(f"SKIP: Local file not found for {photo.image_path} (expected path: {local_path})")
+            skip_count += 1
+            continue
+
+        try:
+            with open(local_path, 'rb') as f:
+                data = f.read()
+            upload_photo_bytes(data, key)
+            print(f"OK: Uploaded {photo.image_path} to R2")
+            success_count += 1
+        except Exception as e:
+            print(f"ERROR: Failed to upload {photo.image_path} to R2: {e}")
+            error_count += 1
+
+    print("\nMigration finished!")
+    print(f"Successfully uploaded: {success_count}")
+    print(f"Skipped (not found):  {skip_count}")
+    print(f"Failed with error:    {error_count}")
+
 if __name__ == "__main__":
     socketio.run(app, debug=True)

@@ -418,10 +418,11 @@ def api_confirm_image():
     # Insert into database
     new_id = add_photo_record(webp_filename, lat, lng)
 
+    from app.game_logic import _resolve_photo_url
     return jsonify({
         'success': True,
         'id': new_id,
-        'imagePath': f'/static/game/photos/{webp_filename}',
+        'imagePath': _resolve_photo_url(f'/static/game/photos/{webp_filename}'),
         'lat': lat,
         'lng': lng,
     })
@@ -429,10 +430,11 @@ def api_confirm_image():
 @app.route("/api/photos")
 def api_list_photos():
     """List all photos in the database."""
+    from app.game_logic import _resolve_photo_url
     photos = Photos.query.order_by(Photos.pid.desc()).all()
     return jsonify([{
         'pid': p.pid,
-        'image_path': p.image_path,
+        'image_path': _resolve_photo_url(p.image_path),
         'latitude': p.latitude,
         'longitude': p.longitude,
         'timestamp': p.timestamp.isoformat() if p.timestamp else None,

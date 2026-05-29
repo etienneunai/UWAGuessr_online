@@ -41,3 +41,6 @@ WTForms==3.2.2
 flask-socketio==5.5.1
 python-socketio==5.12.1
 eventlet==0.39.0
+psycopg2-binary==2.9.10
+boto3==1.36.0
+gunicorn==23.0.0

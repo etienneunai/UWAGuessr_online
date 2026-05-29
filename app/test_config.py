@@ -4,3 +4,5 @@ class TestConfig:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     WTF_CSRF_ENABLED = False
     SECRET_KEY = "test-secret-key"
+    R2_ENABLED = False
+    PHOTO_BASE_URL = ""

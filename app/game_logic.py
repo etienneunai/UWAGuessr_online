@@ -58,19 +58,26 @@ def calculate_score(guess_lat, guess_lng, img_id):
     return max(0, round(score)), distance, actual_lat, actual_lng
 
 
+def _resolve_photo_url(image_path):
+    from app.config import Config
+    if Config.PHOTO_BASE_URL:
+        return Config.PHOTO_BASE_URL.rstrip('/') + '/' + image_path.lstrip('/')
+    return image_path
+
+
 def get_game_images(photo_id_list=None):
     if photo_id_list:
         photos = Photos.query.filter(Photos.pid.in_(photo_id_list)).all()
         photo_map = {photo.pid: photo for photo in photos}
         data = [
-            {"id": pid, "imagePath": photo_map[pid].image_path}
+            {"id": pid, "imagePath": _resolve_photo_url(photo_map[pid].image_path)}
             for pid in photo_id_list if pid in photo_map
         ]
         return data
 
     photos = Photos.query.with_entities(Photos.pid, Photos.image_path).all()
     data = [
-        {"id": photo.pid, "imagePath": photo.image_path}
+        {"id": photo.pid, "imagePath": _resolve_photo_url(photo.image_path)}
         for photo in photos
     ]
     random.shuffle(data)

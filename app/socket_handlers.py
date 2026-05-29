@@ -42,6 +42,13 @@ def handle_join_challenge(data):
     if not challenge_id:
         return
     
+    challenge = Challenge.query.get(challenge_id)
+    if not challenge:
+        return
+        
+    if current_user.uid not in [challenge.challenger_id, challenge.challenged_id]:
+        return
+    
     room = f"challenge_{challenge_id}"
     join_room(room)
     

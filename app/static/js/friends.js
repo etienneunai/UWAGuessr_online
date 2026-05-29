@@ -6,38 +6,91 @@ $(function () {
 
     // ── Load friends list ─────────────────────────────────────────────
     function loadFriends() {
-        $.ajax({
-            url: '/api/friends',
-            method: 'GET',
-            success: function (friends) {
-                const section = $('#friends-list-section');
-                const heading = section.find('.section-heading');
-                section.find('.friend-card').remove();
-                section.find('.friends-empty-message').remove();
+        $.when(
+            $.ajax({ url: '/api/friends', method: 'GET' }),
+            $.ajax({ url: '/api/challenges/active', method: 'GET' })
+        ).then(function (friendsRes, challengesRes) {
+            const friends = friendsRes[0];
+            const challenges = challengesRes[0];
+            
+            const section = $('#friends-list-section');
+            section.find('.friend-card').remove();
+            section.find('.friends-empty-message').remove();
 
-                if (friends.length === 0) {
-                    section.append('<p class="friends-empty-message text-muted-light small mt-2">No friends yet. Search for players to add!</p>');
-                    return;
+            if (friends.length === 0) {
+                section.append('<p class="friends-empty-message text-muted-light small mt-2">No friends yet. Search for players to add!</p>');
+                return;
+            }
+
+            friends.forEach(function (f) {
+                const initials = f.username.substring(0, 2).toUpperCase();
+                
+                // Find if there is an active challenge with this friend
+                const activeChallenge = challenges.find(c => 
+                    (c.challenger_id === f.uid || c.challenged_id === f.uid) &&
+                    (c.status === 'pending' || c.status === 'ready_waiting' || c.status === 'in_progress')
+                );
+
+                let buttonHtml = '';
+                if (!activeChallenge) {
+                    buttonHtml = `
+                        <button class="btn btn-warning btn-sm challenge-invite-btn bangers-font mt-1" data-uid="${f.uid}">
+                            Challenge
+                        </button>
+                    `;
+                } else {
+                    const isChallenger = activeChallenge.challenger_id === current_user_id;
+                    const status = activeChallenge.status;
+                    
+                    if (status === 'pending') {
+                        if (isChallenger) {
+                            buttonHtml = `
+                                <button class="btn btn-outline-warning btn-sm challenge-play-btn bangers-font mt-1" data-id="${activeChallenge.id}">
+                                    Challenge Sent
+                                </button>
+                            `;
+                        } else {
+                            buttonHtml = `
+                                <div class="d-flex gap-1 mt-1">
+                                    <button class="btn btn-warning btn-sm challenge-accept-btn bangers-font" data-id="${activeChallenge.id}">Accept</button>
+                                    <button class="btn btn-outline-light btn-sm challenge-reject-btn bangers-font" data-id="${activeChallenge.id}">Decline</button>
+                                </div>
+                            `;
+                        }
+                    } else if (status === 'ready_waiting' || status === 'in_progress') {
+                        const userFinished = isChallenger ? (activeChallenge.challenger_round >= 6) : (activeChallenge.challenged_round >= 6);
+                        if (userFinished) {
+                            buttonHtml = `
+                                <button class="btn btn-warning btn-sm challenge-play-btn bangers-font mt-1" data-id="${activeChallenge.id}">
+                                    See Game
+                                </button>
+                            `;
+                        } else {
+                            buttonHtml = `
+                                <button class="btn btn-warning btn-sm challenge-play-btn bangers-font mt-1" data-id="${activeChallenge.id}">
+                                    Enter Game
+                                </button>
+                            `;
+                        }
+                    }
                 }
 
-                friends.forEach(function (f) {
-                    const initials = f.username.substring(0, 2).toUpperCase();
-                    section.append(`
-                        <div class="friend-card">
+                // Avatar and name wrapped in link to user's profile
+                section.append(`
+                    <div class="friend-card">
+                        <a href="/user/${f.username}" class="friend-card__avatar-link" style="text-decoration:none;">
                             <div class="friend-card__avatar">${initials}</div>
-                            <div class="friend-card__meta">
-                                <a href="/user/${f.username}" class="friend-card__name" style="color:var(--text-light);text-decoration:none;">
-                                    ${f.username}
-                                </a>
-                                <div class="friend-card__label">${f.total_score ? f.total_score.toLocaleString() + ' pts' : 'No score yet'}</div>
-                                <button class="btn btn-warning btn-sm challenge-invite-btn bangers-font mt-1" data-uid="${f.uid}">
-                                    Challenge
-                                </button>
-                            </div>
+                        </a>
+                        <div class="friend-card__meta">
+                            <a href="/user/${f.username}" class="friend-card__name" style="color:var(--text-light);text-decoration:none;">
+                                ${f.username}
+                            </a>
+                            <div class="friend-card__label">${f.total_score ? f.total_score.toLocaleString() + ' pts' : 'No score yet'}</div>
+                            ${buttonHtml}
                         </div>
-                    `);
-                });
-            }
+                    </div>
+                `);
+            });
         });
     }
 
@@ -50,21 +103,20 @@ $(function () {
                 const section = $('#pending-invites-section');
                 section.find('.pending-card').remove();
                 
-                // Track invites and challenge notifications separately for badges
-                let friendRequestsCount = requests.length;
-
                 if (requests.length === 0) {
-                    section.find('p.no-requests').remove();
-                    section.append('<p class="text-muted-light small mt-2 no-requests">No pending friend requests.</p>');
+                    section.hide();
+                    updateBadges(0);
                 } else {
-                    section.find('p.no-requests').remove();
+                    section.show();
                     requests.forEach(function (r) {
                         const initials = r.username.substring(0, 2).toUpperCase();
                         section.append(`
                             <div class="pending-card" data-id="${r.id}">
-                                <div class="pending-card__avatar">${initials}</div>
+                                <a href="/user/${r.username}" style="text-decoration:none;">
+                                    <div class="pending-card__avatar">${initials}</div>
+                                </a>
                                 <div class="pending-card__meta">
-                                    <div class="pending-card__title">${r.username}</div>
+                                    <a href="/user/${r.username}" class="pending-card__title" style="color:var(--text-light);text-decoration:none;">${r.username}</a>
                                     <div class="d-flex gap-2 mt-1">
                                         <button class="btn btn-warning btn-sm bangers-font accept-btn" data-id="${r.id}">Accept</button>
                                         <button class="btn btn-outline-light btn-sm bangers-font reject-btn" data-id="${r.id}">Reject</button>
@@ -73,104 +125,20 @@ $(function () {
                             </div>
                         `);
                     });
+                    updateBadges(requests.length);
                 }
-
-                // Now load game challenges
-                $.ajax({
-                    url: '/api/challenges/active',
-                    method: 'GET',
-                    success: function (challenges) {
-                        const challengeSection = $('#challenges-section');
-                        challengeSection.find('.challenge-card').remove();
-                        challengeSection.find('p.no-challenges').remove();
-
-                        const pendingIncoming = challenges.filter(c => c.status === 'pending' && c.challenged_id === current_user_id);
-                        const myActive = challenges.filter(c => c.status !== 'pending' || c.challenger_id === current_user_id);
-
-                        // Update badges: friends toggle shows total (invites + incoming challenges),
-                        // invites nav shows friend request count, challenges nav shows incoming challenges
-                        updateBadges(friendRequestsCount, pendingIncoming.length);
-
-                        if (challenges.length === 0) {
-                            challengeSection.append('<p class="text-muted-light small mt-2 no-challenges">No active challenges.</p>');
-                            return;
-                        }
-
-                        challenges.forEach(function (c) {
-                            const isChallenger = c.challenger_id === current_user_id;
-                            const opponent = isChallenger ? c.challenged_username : c.challenger_username;
-                            const initials = opponent.substring(0, 2).toUpperCase();
-                            
-                            let statusText = '';
-                            let actionHtml = '';
-
-                            if (c.status === 'pending') {
-                                if (isChallenger) {
-                                    statusText = 'Waiting for friend...';
-                                    actionHtml = `<span class="text-muted small">Sent</span>`;
-                                } else {
-                                    statusText = 'Challenged you!';
-                                    actionHtml = `
-                                        <div class="d-flex gap-2 mt-1">
-                                            <button class="btn btn-warning btn-sm challenge-accept-btn bangers-font" data-id="${c.id}">Accept</button>
-                                            <button class="btn btn-outline-light btn-sm challenge-reject-btn bangers-font" data-id="${c.id}">Decline</button>
-                                        </div>
-                                    `;
-                                }
-                            } else if (c.status === 'ready_waiting' || c.status === 'in_progress') {
-                                const userFinished = isChallenger ? (c.challenger_round >= 6) : (c.challenged_round >= 6);
-                                if (userFinished) {
-                                    statusText = 'Opponent finishing...';
-                                    actionHtml = `<button class="btn btn-warning btn-sm challenge-play-btn bangers-font" data-id="${c.id}">View Results</button>`;
-                                } else {
-                                    statusText = 'Game in progress!';
-                                    actionHtml = `<button class="btn btn-warning btn-sm challenge-play-btn bangers-font" data-id="${c.id}">Enter Game</button>`;
-                                }
-                            } else {
-                                // completed, expired, or unknown status — skip
-                                return;
-                            }
-
-                            challengeSection.append(`
-                                <div class="pending-card challenge-card" data-id="${c.id}">
-                                    <div class="pending-card__avatar">${initials}</div>
-                                    <div class="pending-card__meta">
-                                        <div class="pending-card__title">${opponent}</div>
-                                        <div class="small text-muted-light">${statusText}</div>
-                                        ${actionHtml}
-                                    </div>
-                                </div>
-                            `);
-                        });
-                    }
-                });
             }
         });
     }
     
-    function updateBadges(inviteCount, challengeCount) {
+    function updateBadges(inviteCount) {
         const toggleBadge = $('#friends-toggle-badge');
-        const invitesBadge = $('#invites-nav-badge');
-        const challengesBadge = $('#challenges-nav-badge');
-
-        const total = (inviteCount || 0) + (challengeCount || 0);
+        const total = inviteCount || 0;
 
         if (total > 0) {
             toggleBadge.text(total > 9 ? '9+' : total).show();
         } else {
             toggleBadge.hide();
-        }
-
-        if ((inviteCount || 0) > 0) {
-            invitesBadge.text(inviteCount > 9 ? '9+' : inviteCount).show();
-        } else {
-            invitesBadge.hide();
-        }
-
-        if ((challengeCount || 0) > 0) {
-            challengesBadge.text(challengeCount > 9 ? '9+' : challengeCount).show();
-        } else {
-            challengesBadge.hide();
         }
     }
 
@@ -209,7 +177,9 @@ $(function () {
                         const initials = u.username.substring(0, 2).toUpperCase();
                         html += `
                             <div class="friend-card mt-2">
-                                <div class="friend-card__avatar">${initials}</div>
+                                <a href="/user/${u.username}" style="text-decoration:none;">
+                                    <div class="friend-card__avatar">${initials}</div>
+                                </a>
                                 <div class="friend-card__meta">
                                     <a href="/user/${u.username}" class="friend-card__name" style="color:var(--text-light);text-decoration:none;">${u.username}</a>
                                     <div>${btnHtml}</div>
@@ -260,7 +230,8 @@ $(function () {
             data: JSON.stringify({ id: id, action: action }),
             success: function () {
                 $card.remove();
-                if (action === 'accept') loadFriends();
+                loadFriends();
+                loadPendingRequests();
             }
         });
     });
@@ -287,8 +258,8 @@ $(function () {
                     window.location.href = data.redirect;
                     return;
                 }
-                $btn.text('Sent!').addClass('btn-success').removeClass('btn-warning');
-                loadPendingRequests(); // Refresh Active Challenges list
+                loadFriends();
+                loadPendingRequests();
             },
             error: function (xhr) {
                 $btn.prop('disabled', false).text('Challenge');
@@ -314,14 +285,14 @@ $(function () {
             error: function (xhr) {
                 $btn.prop('disabled', false);
                 alert(xhr.responseJSON?.error || 'This challenge is no longer available');
-                loadPendingRequests(); // Refresh to remove expired challenges
+                loadFriends();
+                loadPendingRequests();
             }
         });
     });
 
     $(document).on('click', '.challenge-reject-btn', function () {
         const id = $(this).data('id');
-        const $card = $(this).closest('.challenge-card');
 
         $.ajax({
             url: '/api/challenges/respond',
@@ -330,7 +301,8 @@ $(function () {
             headers: { 'X-CSRFToken': getCSRFToken() },
             data: JSON.stringify({ id: id, action: 'reject' }),
             success: function () {
-                $card.remove();
+                loadFriends();
+                loadPendingRequests();
             }
         });
     });
@@ -346,7 +318,7 @@ $(function () {
         loadPendingRequests();
     });
 
-    // ── Initial load if sidebar is already open ───────────────────────
+    // ── Initial load ───────────────────────
     loadFriends();
     loadPendingRequests();
 
@@ -359,23 +331,27 @@ $(function () {
         });
         
         socket.on('new_challenge', (data) => {
-            // Automatically reload pending invites/challenges and refresh badges
+            loadFriends();
             loadPendingRequests();
         });
 
         socket.on('friend_request_update', () => {
+            loadFriends();
             loadPendingRequests();
         });
 
         socket.on('friend_list_update', () => {
             loadFriends();
+            loadPendingRequests();
         });
 
         socket.on('ready_update', () => {
+            loadFriends();
             loadPendingRequests();
         });
 
         socket.on('status_update', () => {
+            loadFriends();
             loadPendingRequests();
         });
     }

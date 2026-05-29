@@ -88,17 +88,55 @@ def api_game_images():
 
     return jsonify(get_game_images(photo_ids))
 
+@app.route("/api/start-round", methods=["POST"])
+def api_start_round():
+    from datetime import datetime
+    from flask import session
+    data = request.json or {}
+    img_id = data.get('id')
+    if img_id is None:
+        return jsonify({'error': 'Missing image ID'}), 400
+    
+    if 'round_starts' not in session:
+        session['round_starts'] = {}
+    
+    session['round_starts'][str(img_id)] = datetime.utcnow().isoformat()
+    session.modified = True
+    return jsonify({'success': True})
+
 @app.route("/api/guess", methods=["POST"])
 def api_guess():
     from app.game_logic import calculate_score
+    from datetime import datetime
+    from flask import session
+    
     data = request.json
     guess_lat = data.get('lat')
     guess_lng = data.get('lng')
     img_id = data.get('id')
+    challenge_id = data.get('challengeId')
     
     if guess_lat is None or guess_lng is None or img_id is None:
         return jsonify({'error': 'Missing required fields'}), 400
         
+    # Server-Side Timer Validation
+    if 'round_starts' in session and str(img_id) in session['round_starts']:
+        start_time_str = session['round_starts'][str(img_id)]
+        start_time = datetime.fromisoformat(start_time_str)
+        elapsed = (datetime.utcnow() - start_time).total_seconds()
+        if elapsed > 22.0:
+            return jsonify({'error': 'Time limit exceeded'}), 400
+            
+    # Photo Integrity Verification
+    if challenge_id:
+        from app.models import Challenge
+        challenge = Challenge.query.get(challenge_id)
+        if not challenge:
+            return jsonify({'error': 'Invalid challenge ID'}), 400
+        allowed_pids = challenge.photo_ids.split(',')
+        if str(img_id) not in allowed_pids:
+            return jsonify({'error': 'Photo ID not associated with this challenge'}), 400
+            
     score, distance, actual_lat, actual_lng = calculate_score(guess_lat, guess_lng, img_id)
     if score is None:
         return jsonify({'error': 'Invalid image ID'}), 404
@@ -459,15 +497,28 @@ def api_create_challenge():
     ).first()
 
     if existing:
+        # Check if the current user has already finished their rounds in this existing challenge
+        user_finished = (
+            (existing.challenger_id == current_user.uid and (existing.challenger_round or 0) >= 6) or
+            (existing.challenged_id == current_user.uid and (existing.challenged_round or 0) >= 6)
+        )
+        if user_finished:
+            return jsonify({'error': 'Opponent is still finishing a previous game with you.'}), 400
+
         if existing.challenged_id == current_user.uid and existing.status == 'pending':
             # Auto-accept the incoming challenge instead of creating a duplicate
             existing.status = 'ready_waiting'
             db.session.commit()
+            
+            # Emit socket ready_update
+            from app import socketio
+            socketio.emit('ready_update', existing.to_dict(), room=f"challenge_{existing.id}")
+            socketio.emit('ready_update', existing.to_dict(), room=f"user_{existing.challenger_id}")
+            socketio.emit('ready_update', existing.to_dict(), room=f"user_{existing.challenged_id}")
+            
             return jsonify({'challenge_id': existing.id, 'redirect': url_for('game', challenge_id=existing.id)})
-        elif existing.challenger_id == current_user.uid and existing.status == 'pending':
-            return jsonify({'error': 'Challenge already sent. Waiting for response.'}), 409
         else:
-            return jsonify({'error': 'An active challenge already exists with this user.'}), 409
+            return jsonify({'challenge_id': existing.id, 'redirect': url_for('game', challenge_id=existing.id)})
 
     # Get 5 random photo IDs
     all_photos = Photos.query.all()
@@ -485,6 +536,10 @@ def api_create_challenge():
     )
     db.session.add(challenge)
     db.session.commit()
+
+    # Emit new_challenge socket event to the challenged user's global room
+    from app import socketio
+    socketio.emit('new_challenge', challenge.to_dict(), room=f"user_{challenged_id}")
 
     return jsonify({'challenge_id': challenge.id}), 201
 
@@ -507,13 +562,11 @@ def api_get_active_challenges():
             c.status = 'expired'
         db.session.commit()
 
-    # Get challenges where user is involved and hasn't already finished
+    # Get challenges where user is involved and hasn't already finished (or opponent is still playing)
     challenges = Challenge.query.filter(
         ((Challenge.challenger_id == current_user.uid) |
          (Challenge.challenged_id == current_user.uid)),
-        Challenge.status.in_(['pending', 'ready_waiting', 'in_progress']),
-        ~((Challenge.challenger_id == current_user.uid) & (Challenge.challenger_round >= 6)),
-        ~((Challenge.challenged_id == current_user.uid) & (Challenge.challenged_round >= 6))
+        Challenge.status.in_(['pending', 'ready_waiting', 'in_progress'])
     ).all()
     
     return jsonify([c.to_dict() for c in challenges])
@@ -553,8 +606,21 @@ def api_respond_challenge():
     if action == 'accept':
         challenge.status = 'ready_waiting'
         db.session.commit()
+        
+        # Emit socket ready_update
+        from app import socketio
+        socketio.emit('ready_update', challenge.to_dict(), room=f"challenge_{challenge.id}")
+        socketio.emit('ready_update', challenge.to_dict(), room=f"user_{challenge.challenger_id}")
+        socketio.emit('ready_update', challenge.to_dict(), room=f"user_{challenge.challenged_id}")
+        
         return jsonify({'message': 'Challenge accepted', 'redirect': url_for('game', challenge_id=challenge.id)})
     else:
+        # Emit challenge_rejected socket event
+        from app import socketio
+        socketio.emit('challenge_rejected', {'challenge_id': challenge.id}, room=f"challenge_{challenge.id}")
+        socketio.emit('ready_update', {'id': challenge_id, 'status': 'rejected'}, room=f"user_{challenge.challenger_id}")
+        socketio.emit('ready_update', {'id': challenge_id, 'status': 'rejected'}, room=f"user_{challenge.challenged_id}")
+        
         db.session.delete(challenge)
         db.session.commit()
         return jsonify({'message': 'Challenge rejected'})
@@ -580,6 +646,17 @@ def api_challenge_ready():
         challenge.status = 'in_progress'
         
     db.session.commit()
+    
+    # Emit socket events
+    from app import socketio
+    socketio.emit('ready_update', challenge.to_dict(), room=f"challenge_{challenge.id}")
+    socketio.emit('ready_update', challenge.to_dict(), room=f"user_{challenge.challenger_id}")
+    socketio.emit('ready_update', challenge.to_dict(), room=f"user_{challenge.challenged_id}")
+    if challenge.status == 'in_progress':
+        socketio.emit('status_update', challenge.to_dict(), room=f"challenge_{challenge.id}")
+        socketio.emit('status_update', challenge.to_dict(), room=f"user_{challenge.challenger_id}")
+        socketio.emit('status_update', challenge.to_dict(), room=f"user_{challenge.challenged_id}")
+        
     return jsonify(challenge.to_dict())
 
 @app.route("/api/challenges/update-progress", methods=["POST"])
@@ -614,6 +691,15 @@ def api_challenge_progress():
         return jsonify({'error': 'Score out of valid range'}), 400
 
     db.session.commit()
+    
+    # Emit opponent_progress socket event
+    from app import socketio
+    socketio.emit('opponent_progress', {
+        'user_id': current_user.uid,
+        'round': round_num,
+        'score': score
+    }, room=f"challenge_{challenge.id}")
+    
     return jsonify({'success': True})
 
 @app.route("/api/game-complete", methods=["POST"])
@@ -667,6 +753,12 @@ def api_game_complete():
             if (challenge.challenger_round or 0) >= 6 and (challenge.challenged_round or 0) >= 6:
                 challenge.status = 'completed'
             db.session.commit()
+            
+            # Emit socket status_update
+            from app import socketio
+            socketio.emit('status_update', challenge.to_dict(), room=f"challenge_{challenge.id}")
+            socketio.emit('status_update', challenge.to_dict(), room=f"user_{challenge.challenger_id}")
+            socketio.emit('status_update', challenge.to_dict(), room=f"user_{challenge.challenged_id}")
 
     return jsonify({'success': True, 'totalScore': current_user.total_score})
 
@@ -773,6 +865,10 @@ def api_add_friend():
     db.session.add(friendship)
     db.session.commit()
 
+    # Emit socket event
+    from app import socketio
+    socketio.emit('friend_request_update', room=f"user_{receiver.uid}")
+
     return jsonify({'message': f'Friend request sent to {receiver.username}'}), 201
 
 @app.route("/api/friends/respond", methods=["POST"])
@@ -794,10 +890,23 @@ def api_respond_friend_request():
     if action == 'accept':
         friendship.status = 'accepted'
         db.session.commit()
+
+        # Emit socket events
+        from app import socketio
+        socketio.emit('friend_request_update', room=f"user_{friendship.requester_id}")
+        socketio.emit('friend_list_update', room=f"user_{friendship.requester_id}")
+        socketio.emit('friend_list_update', room=f"user_{friendship.receiver_id}")
+
         return jsonify({'message': 'Friend request accepted'})
     else:
+        requester_id = friendship.requester_id
         db.session.delete(friendship)
         db.session.commit()
+
+        # Emit socket event
+        from app import socketio
+        socketio.emit('friend_request_update', room=f"user_{requester_id}")
+
         return jsonify({'message': 'Friend request rejected'})
 
 if __name__ == "__main__":

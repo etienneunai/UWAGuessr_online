@@ -118,8 +118,14 @@ $(function () {
                                     `;
                                 }
                             } else if (c.status === 'ready_waiting' || c.status === 'in_progress') {
-                                statusText = 'Game in progress!';
-                                actionHtml = `<button class="btn btn-warning btn-sm challenge-play-btn bangers-font" data-id="${c.id}">Enter Game</button>`;
+                                const userFinished = isChallenger ? (c.challenger_round >= 6) : (c.challenged_round >= 6);
+                                if (userFinished) {
+                                    statusText = 'Opponent finishing...';
+                                    actionHtml = `<button class="btn btn-warning btn-sm challenge-play-btn bangers-font" data-id="${c.id}">View Results</button>`;
+                                } else {
+                                    statusText = 'Game in progress!';
+                                    actionHtml = `<button class="btn btn-warning btn-sm challenge-play-btn bangers-font" data-id="${c.id}">Enter Game</button>`;
+                                }
                             } else {
                                 // completed, expired, or unknown status — skip
                                 return;
@@ -344,10 +350,33 @@ $(function () {
     loadFriends();
     loadPendingRequests();
 
-    // Auto-refresh challenges every 10 seconds while sidebar is open
-    setInterval(function() {
-        if ($('#friends-sidebar').hasClass('open')) {
+    // ── Global WebSocket for challenges/notifications ────────────────
+    let socket = null;
+    if (window.current_user_id) {
+        socket = io();
+        socket.on('connect', () => {
+            socket.emit('join_global', { user_id: window.current_user_id });
+        });
+        
+        socket.on('new_challenge', (data) => {
+            // Automatically reload pending invites/challenges and refresh badges
             loadPendingRequests();
-        }
-    }, 10000);
+        });
+
+        socket.on('friend_request_update', () => {
+            loadPendingRequests();
+        });
+
+        socket.on('friend_list_update', () => {
+            loadFriends();
+        });
+
+        socket.on('ready_update', () => {
+            loadPendingRequests();
+        });
+
+        socket.on('status_update', () => {
+            loadPendingRequests();
+        });
+    }
 });

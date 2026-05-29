@@ -4,6 +4,7 @@ from flask_sqlalchemy import SQLAlchemy
 from app.config import Config
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
+from flask_socketio import SocketIO
 
 app = Flask(__name__)
 csrf = CSRFProtect()
@@ -14,10 +15,12 @@ migrate = Migrate(app, db)
 login = LoginManager(app)
 login.login_view = 'login'
 
+socketio = SocketIO(app, cors_allowed_origins="*")
+
 @login.user_loader
 def load_user(id):
     from app.models import User
     return User.query.get(int(id))
 
 
-from app import routes, models
+from app import routes, models, socket_handlers

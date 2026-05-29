@@ -68,7 +68,7 @@
         <div class="row g-4">
 
             <!-- profile info  -->
-            <div class="col-lg-4">
+            <div class="col-lg-{{ '6' if profile_user is defined else '4' }}">
                 <div class="dashboard-card h-100 p-4">
                     <h2 class="orbitron-font h5 mb-4 card-title-gold">Profile</h2>
                     <div class="profile-stat mb-3">
@@ -93,7 +93,7 @@
             </div>
 
             <!-- recent games -->
-            <div class="col-lg-4">
+            <div class="col-lg-{{ '6' if profile_user is defined else '4' }}">
                 <div class="dashboard-card h-100 p-4">
                     <h2 class="orbitron-font h5 mb-4 card-title-gold">Recent Scores</h2>
                     <div id="recentScores">
@@ -127,7 +127,7 @@
             {% if profile_user is not defined %}
             <div class="col-lg-4">  
                 <div class="dashboard-card h-100 p-4">
-                    <h2 class="orbitron-font h5 mb-4 card-title-gold">Friends</h2>
+                    <h2 class="orbitron-font h5 mb-4 card-title-gold">Friends List</h2>
                     <div id="friendsList">
                         <div class="empty-state">
                             <p class="text-muted-light">No friends added yet.</p>

@@ -210,6 +210,11 @@ function connectSocket() {
         if (window.DEBUG) console.log("Connected to WebSocket server");
         // Join the challenge room
         socket.emit('join_challenge', { challenge_id: challengeId });
+        
+        // Also join the global user room to receive rematch requests
+        if (window.current_user_id) {
+            socket.emit('join_global', { user_id: window.current_user_id });
+        }
     });
     
     socket.on('disconnect', () => {
@@ -240,6 +245,61 @@ function connectSocket() {
         } else if (challengeData.status === 'completed') {
             // Show Game Over screen with live results
             updateChallengeGameOverDisplay(challengeData);
+        }
+    });
+
+    socket.on('new_challenge', (data) => {
+        if (window.DEBUG) console.log("New challenge/rematch received:", data);
+        if (data.id && challengeData) {
+            // Check if this new challenge is from the current opponent
+            fetch(`/api/challenges/poll/${data.id}`)
+            .then(res => res.json())
+            .then(newChallenge => {
+                const opponentUid = challengeData.challenger_id === window.current_user_id ? challengeData.challenged_id : challengeData.challenger_id;
+                if (newChallenge.challenger_id === opponentUid) {
+                    const statusEl = document.getElementById('final-status');
+                    if (statusEl) {
+                        statusEl.innerText = `${newChallenge.challenger_username} requested a rematch!`;
+                        statusEl.style.color = '#ffc107';
+                    }
+                    const playAgainBtn = document.getElementById('play-again-btn');
+                    if (playAgainBtn) {
+                        playAgainBtn.innerText = 'Accept Rematch';
+                        playAgainBtn.classList.remove('btn-game-action');
+                        playAgainBtn.classList.add('btn-success');
+                        playAgainBtn.onclick = null;
+                        
+                        // Override click to accept the rematch
+                        playAgainBtn.onclick = function(e) {
+                            e.preventDefault();
+                            playAgainBtn.disabled = true;
+                            playAgainBtn.innerText = 'Joining...';
+                            
+                            // Accept the challenge
+                            fetch('/api/challenges/respond', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRFToken': getCSRFToken()
+                                },
+                                body: JSON.stringify({ id: data.id, action: 'accept' })
+                            })
+                            .then(res => res.json())
+                            .then(resp => {
+                                window.location.href = `/game?challengeId=${data.id}`;
+                            })
+                            .catch(err => {
+                                playAgainBtn.disabled = false;
+                                playAgainBtn.innerText = 'Accept Rematch';
+                                alert('Could not accept rematch.');
+                            });
+                        };
+                    }
+                }
+            })
+            .catch(err => {
+                if (window.DEBUG) console.error("Failed to fetch rematch details:", err);
+            });
         }
     });
     
@@ -692,7 +752,7 @@ function showGameOver(shouldSubmitCompletion = true) {
 
     var playAgainBtn = document.getElementById('play-again-btn');
     if (playAgainBtn) {
-        playAgainBtn.style.display = challengeId ? 'none' : '';
+        playAgainBtn.style.display = '';
     }
     
     if (challengeId) {
@@ -811,6 +871,43 @@ function resetPhotoTransform() {
     panoViewer.setPitch(0);
     panoViewer.setYaw(0);
     panoViewer.setHfov(DEFAULT_HFOV);
+}
+
+// Rematch button handler
+var playAgainBtn = document.getElementById('play-again-btn');
+if (playAgainBtn) {
+    playAgainBtn.addEventListener('click', function(e) {
+        if (challengeId && challengeData) {
+            e.preventDefault();
+            const opponentUid = challengeData.challenger_id === window.current_user_id ? challengeData.challenged_id : challengeData.challenger_id;
+            
+            playAgainBtn.disabled = true;
+            playAgainBtn.innerText = 'Requesting...';
+            
+            fetch('/api/challenges/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                },
+                body: JSON.stringify({ uid: opponentUid })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.redirect) {
+                    window.location.href = data.redirect;
+                } else {
+                    playAgainBtn.disabled = false;
+                    playAgainBtn.innerText = 'Play Again';
+                }
+            })
+            .catch(err => {
+                playAgainBtn.disabled = false;
+                playAgainBtn.innerText = 'Play Again';
+                alert('Could not start rematch.');
+            });
+        }
+    });
 }
 
 // Initialize on page load

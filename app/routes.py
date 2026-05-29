@@ -100,7 +100,7 @@ def api_start_round():
     if 'round_starts' not in session:
         session['round_starts'] = {}
 
-    session['round_starts'].setdefault(str(img_id), datetime.utcnow().isoformat())
+    session['round_starts'][str(img_id)] = datetime.utcnow().isoformat()
     session.modified = True
     return jsonify({'success': True})
 

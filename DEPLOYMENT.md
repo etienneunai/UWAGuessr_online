@@ -24,10 +24,12 @@ UWAGuessr currently runs only locally: SQLite database, local filesystem image s
 
 ## Files to Modify
 
-### 1. `requirements.txt` — Add 3 dependencies
+### 1. `requirements.txt` — Add 5 dependencies
 - `psycopg2-binary==2.9.10` — PostgreSQL driver
 - `boto3==1.36.0` — S3-compatible client for Cloudflare R2
 - `gunicorn==23.0.0` — Production WSGI server
+- `flask-socketio==5.5.1` — WebSocket integration
+- `eventlet==0.39.0` — Async worker for WebSockets
 
 ### 2. `app/config.py` — Add R2 and PostgreSQL config
 - Add class attributes: `R2_ENABLED`, `R2_ENDPOINT_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `PHOTO_BASE_URL` — all read from env vars with sensible defaults (empty/false)
@@ -85,8 +87,8 @@ Group=uwaguessr
 WorkingDirectory=/opt/uwaguessr
 EnvironmentFile=/opt/uwaguessr/.env
 ExecStart=/opt/uwaguessr/venv/bin/gunicorn app:app \
-    --workers 9 \
-    --worker-class sync \
+    --workers 1 \
+    --worker-class eventlet \
     --timeout 120 \
     --access-logfile - \
     --error-logfile - \
@@ -101,7 +103,7 @@ WantedBy=multi-user.target
 
 Notes:
 - Socket binding at `/run/uwaguessr/gunicorn.sock` — Nginx proxies to this socket (zero TCP overhead vs `localhost:8000`)
-- Worker count 9 = `2 × cores(4) + 1` — Ampere A1 maxes at 4 OCPU. Adjust down if using a smaller shape.
+- **Worker count**: Set to `1` because `Flask-SocketIO` requires a message queue (like Redis) to sync events across multiple workers. A single `eventlet` worker is highly concurrent and can handle thousands of WebSocket connections. If you want to utilize all 4 OCPUs, you must install Redis and configure `SocketIO(app, message_queue='redis://')`, then you can increase workers.
 - `PrivateTmp=true` — isolates `/tmp`, harmless for this app
 - `EnvironmentFile` — loads DATABASE_URL, UWAGUESSR_SECRET_KEY, R2_* vars, PHOTO_BASE_URL from a file outside the repo
 
@@ -141,6 +143,18 @@ server {
     # Temp upload preview (admin only, ephemeral)
     location /instance/ {
         alias /opt/uwaguessr/instance/;
+    }
+
+    # WebSocket support
+    location /socket.io/ {
+        proxy_pass http://uwaguessr_app;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "Upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 
     # All other requests → Gunicorn
@@ -330,7 +344,7 @@ In Cloudflare R2 dashboard, add CORS rule for the bucket:
 
 - **PostgreSQL sequence sync:** After `flask load-photos` inserts explicit `pid` values, run `SELECT setval('photos_pid_seq', (SELECT MAX(pid) FROM photos))` to prevent duplicate key errors on new uploads.
 - **OCI iptables firewall:** Ubuntu on OCI runs an OS-level iptables firewall in addition to the VCN security list. Both must allow ports 80/443. Use `netfilter-persistent` to save rules across reboots.
-- **gunicorn worker count:** Ampere A1 provides up to 4 OCPU and 24 GB RAM. Formula `2 × cores + 1 = 9` workers. Flask + gunicorn per-worker memory is ~100 MB, so 9 workers ≈ 900 MB — well within 24 GB. No OOM risk.
+- **gunicorn worker count:** Ampere A1 provides up to 4 OCPU and 24 GB RAM. Due to WebSockets without a message queue, workers are capped at 1 `eventlet` worker. If CPU becomes a bottleneck, install Redis and update the SocketIO configuration to enable multiple workers (`2 × cores + 1 = 9`).
 - **R2 CORS:** Pannellum loads images cross-origin. R2 bucket must allow GET from the deployment domain (configured in Phase 12).
 - **Persistent disk:** Unlike Render, OCI VMs have persistent block storage (up to 200 GB on Always Free). `instance/uploads/` and `app/static/` survive reboots and deploys. Local photo directory is still unused in production (R2 is source of truth).
 - **systemd journal:** All gunicorn stdout/stderr captured by journald. View logs: `journalctl -u uwaguessr -f`. Nginx logs at `/var/log/nginx/`.

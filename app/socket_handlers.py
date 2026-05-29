@@ -101,27 +101,14 @@ def handle_score_update(data):
     challenge_id = data.get('challenge_id')
     round_num = data.get('round')
     score = data.get('score')
-
+    
     if not challenge_id or round_num is None or score is None:
         return
-
-    try:
-        rnd = int(round_num)
-        scr = int(score)
-    except (TypeError, ValueError):
-        return
-    if rnd < 1 or rnd > 5:
-        return
-    if scr < 0 or scr > rnd * 5000:
-        return
-
-    round_num = rnd
-    score = scr
-
+        
     challenge = Challenge.query.get(challenge_id)
     if not challenge:
         return
-
+        
     if current_user.uid == challenge.challenger_id:
         challenge.challenger_round = round_num
         challenge.challenger_score = score
@@ -130,7 +117,7 @@ def handle_score_update(data):
         challenge.challenged_score = score
     else:
         return
-
+        
     db.session.commit()
     
     room = f"challenge_{challenge_id}"
@@ -146,15 +133,7 @@ def handle_game_complete(data):
     score = data.get('score')
     if not challenge_id or score is None:
         return
-
-    try:
-        score = int(score)
-    except (TypeError, ValueError):
-        return
-
-    if score < 0 or score > 25000:
-        return
-
+        
     challenge = Challenge.query.get(challenge_id)
     if not challenge:
         return

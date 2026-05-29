@@ -44,7 +44,7 @@ $(function () {
                         </button>
                     `;
                 } else {
-                    const isChallenger = activeChallenge.challenger_id === window.current_user_id;
+                    const isChallenger = activeChallenge.challenger_id === current_user_id;
                     const status = activeChallenge.status;
                     
                     if (status === 'pending') {

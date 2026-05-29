@@ -3,7 +3,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Set test env vars BEFORE importing app — Config reads them at class-definition
 # time, and Flask-SQLAlchemy creates the engine immediately in init_app().
-os.environ['DATABASE_URL'] = 'sqlite:///:memory:'
+os.environ['DATABASE_URL'] = 'sqlite:///test.db'
 os.environ['UWAGUESSR_SECRET_KEY'] = 'test-secret-key'
 
 import pytest
@@ -25,6 +25,17 @@ def app():
     db.session.remove()
     db.drop_all()
     ctx.pop()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def cleanup_test_db():
+    yield
+    db_path = os.path.join(flask_app.root_path, '..', 'test.db')
+    if os.path.exists(db_path):
+        try:
+            os.remove(db_path)
+        except OSError:
+            pass
 
 
 @pytest.fixture

@@ -4,10 +4,13 @@ import time
 
 import pytest
 from selenium import webdriver
+from selenium.webdriver.common.by import By
 
 from app import app, db
-from app.models import Photos
+from app import socketio
+from app.models import Photos, User, Challenge
 from app.test_config import TestConfig
+
 
 
 class SeleniumTests(unittest.TestCase):
@@ -34,7 +37,7 @@ class SeleniumTests(unittest.TestCase):
         db.session.commit()
 
         cls.server_thread = threading.Thread(
-            target=lambda: app.run(port=5050, use_reloader=False)
+            target=lambda: socketio.run(app, port=5055, use_reloader=False, allow_unsafe_werkzeug=True)
         )
 
         cls.server_thread.daemon = True
@@ -46,7 +49,7 @@ class SeleniumTests(unittest.TestCase):
         options.add_argument("--headless=new")
 
         cls.driver = webdriver.Chrome(options=options)
-        cls.base_url = "http://127.0.0.1:5050"
+        cls.base_url = "http://127.0.0.1:5055"
 
     @classmethod
     def tearDownClass(cls):
@@ -87,8 +90,7 @@ class SeleniumTests(unittest.TestCase):
         self.assertIn("UWA", self.driver.page_source)
     
     def login_test_user(self):
-        from app import db
-        from app.models import User  
+
         test_email = "testuser@student.uwa.edu.au"
         user = User.query.filter_by(email=test_email).first()
         if not user:
@@ -100,14 +102,74 @@ class SeleniumTests(unittest.TestCase):
         self.driver.get(self.base_url + "/login")
         time.sleep(0.5)
         
-        from selenium.webdriver.common.by import By
+
         
         self.driver.find_element(By.ID, "email").send_keys(test_email)
         self.driver.find_element(By.ID, "password").send_keys("password123")
         
         
         self.driver.find_element(By.ID, "signinBtn").click()
-        time.sleep(1.0)
+        # Wait until redirected away from the login page to avoid race conditions
+        for _ in range(10):
+            if "/login" not in self.driver.current_url:
+                break
+            time.sleep(0.5)
+
+    def test_challenge_rejoin_game_starts_at_correct_round(self):
+        # 1. Log in the user
+        self.login_test_user()
+        
+        # 2. Add another user and create an active in_progress challenge between them in DB
+
+        
+        challenger = User.query.filter_by(username="TestPlayer").first()
+        challenged = User.query.filter_by(username="OpponentPlayer").first()
+        if not challenged:
+            challenged = User(username="OpponentPlayer", email="opponent@student.uwa.edu.au")
+            challenged.set_password("password123")
+            db.session.add(challenged)
+            db.session.commit()
+        
+        # Fresh 5 photos in the DB
+        Photos.query.delete()
+        for i in range(5):
+            p = Photos(image_path=f"test{i}.webp", latitude=-31.98, longitude=115.81)
+            db.session.add(p)
+        db.session.commit()
+        
+        all_photos = Photos.query.all()[:5]
+        photo_ids = ",".join([str(p.pid) for p in all_photos])
+        
+        # Delete existing challenges to avoid conflict
+        Challenge.query.delete()
+        
+        challenge = Challenge(
+            challenger_id=challenger.uid,
+            challenged_id=challenged.uid,
+            photo_ids=photo_ids,
+            status="in_progress",
+            challenger_ready=True,
+            challenged_ready=True,
+            challenger_round=2, # Round 2
+            challenger_score=1000 # Score 1000
+        )
+        db.session.add(challenge)
+        db.session.commit()
+        
+        # 3. Get game page with challengeId
+        self.driver.get(f"{self.base_url}/game?challengeId={challenge.id}")
+        time.sleep(2.0) # Wait for page load and API calls
+        
+        # 4. Check if it rejoined at Round 2
+        page_content = self.driver.page_source
+        self.assertIn("Round 2 / 5", page_content)
+        
+        current_round_index = self.driver.execute_script("return currentRoundIndex;")
+        total_score = self.driver.execute_script("return totalScore;")
+        self.assertEqual(current_round_index, 1)
+        self.assertEqual(total_score, 1000)
+
+
 
 
 if __name__ == "__main__":

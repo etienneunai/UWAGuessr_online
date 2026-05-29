@@ -8,6 +8,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 from app import app, db
+from app import socketio
 from app.models import User, Photos
 from app.test_config import TestConfig
 
@@ -33,7 +34,7 @@ class AuthSeleniumTests(unittest.TestCase):
         db.session.commit()
 
         cls.server_thread = threading.Thread(
-            target=lambda: app.run(port=5051, use_reloader=False)
+            target=lambda: socketio.run(app, port=5056, use_reloader=False, allow_unsafe_werkzeug=True)
         )
         cls.server_thread.daemon = True
         cls.server_thread.start()
@@ -42,7 +43,7 @@ class AuthSeleniumTests(unittest.TestCase):
         options = webdriver.ChromeOptions()
         options.add_argument("--headless=new")
         cls.driver = webdriver.Chrome(options=options)
-        cls.base_url = "http://127.0.0.1:5051"
+        cls.base_url = "http://127.0.0.1:5056"
         cls.wait = WebDriverWait(cls.driver, 10)
 
     @classmethod

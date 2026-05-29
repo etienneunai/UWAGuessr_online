@@ -89,69 +89,33 @@
 
 <div id="friends-backdrop" class="friends-backdrop"></div>
 <div id="friends-sidebar" class="friends-sidebar" aria-hidden="true">
-    <div class="friends-sidebar__inner">
-        <div class="friends-sidebar__nav">
-            <button id="sidebar-nav-friends" class="friends-sidebar__nav-button active" type="button" aria-label="Friends">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                </svg>
-            </button>
-            <button id="sidebar-nav-invites" class="friends-sidebar__nav-button" type="button" aria-label="Invites">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7" />
-                    <path d="M3 7l9 6 9-6" />
-                </svg>
-                <span id="invites-nav-badge" class="friends-badge" style="display:none;"></span>
-            </button>
-            <button id="sidebar-nav-challenges" class="friends-sidebar__nav-button" type="button" aria-label="Challenges">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="12" cy="12" r="10" />
-                    <path d="M12 6v6l4 2" />
-                </svg>
-                <span id="challenges-nav-badge" class="friends-badge" style="display:none;"></span>
-            </button>
+    <div class="friends-sidebar__panel">
+        <div class="friends-sidebar__header">
+            <h2>FRIENDS</h2>
+            <div class="ms-auto d-flex gap-2">
+                <button id="friends-refresh" type="button" class="btn btn-sm btn-outline-light" aria-label="Refresh lists" title="Refresh">↻</button>
+                <button id="friends-close" type="button" class="btn btn-sm btn-outline-light">×</button>
+            </div>
         </div>
-                    
-        <div class="friends-sidebar__panel">
-            <div class="friends-sidebar__header">
-                <h2>FRIENDS</h2>
-                <div class="ms-auto d-flex gap-2">
-                    <button id="friends-refresh" type="button" class="btn btn-sm btn-outline-light" aria-label="Refresh lists" title="Refresh">↻</button>
-                    <button id="friends-close" type="button" class="btn btn-sm btn-outline-light">×</button>
-                </div>
-            </div>
 
-            <div>
-                <label for="friends-search" class="form-label">Search players</label>
-                <input id="friends-search" type="text" class="form-control" placeholder="Search players" />
-            </div>
-
-            <div class="friends-sidebar__button-wrap">
-                <button id="friends-add" type="button" class="btn btn-warning bangers-font">Add Friend</button>
-            </div>
-
-           <section id="friends-list-section">
-                <div class="section-heading">
-                    <h3>Friends List</h3>
-                </div>
-           </section>
-
-            <section id="pending-invites-section" class="section-hidden">
-                <div class="section-heading">
-                    <h3>Pending Invites</h3>
-                </div>
-            </section>
-
-            <section id="challenges-section" class="section-hidden">
-                <div class="section-heading">
-                    <h3>Active Challenges</h3>
-                </div>
-            </section>
-
+        <div>
+            <label for="friends-search" class="form-label">Search players</label>
+            <input id="friends-search" type="text" class="form-control" placeholder="Search players" />
         </div>
+
+
+       <section id="friends-list-section">
+            <div class="section-heading">
+                <h3>Friends List</h3>
+            </div>
+       </section>
+
+        <section id="pending-invites-section">
+            <div class="section-heading">
+                <h3>Pending Invites</h3>
+            </div>
+        </section>
+
     </div>
 </div>
 {% endif %}

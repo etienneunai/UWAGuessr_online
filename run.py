@@ -1,4 +1,4 @@
-from app import app
+from app import app, socketio
 from app.controllers import register_user
 import click
 
@@ -62,4 +62,4 @@ def admin_demote(username):
     print(f"{username} has been demoted from admin")
 
 if __name__ == "__main__":
-    app.run()
+    socketio.run(app, debug=True)

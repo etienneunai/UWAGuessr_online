@@ -160,6 +160,7 @@ class TestGameImagesAPI:
 class TestGuessAPI:
 
     def test_valid_guess_returns_score_and_distance(self, client, photo):
+        client.post("/api/start-round", json={"id": photo.pid})
         resp = client.post("/api/guess", json={
             "lat": photo.latitude, "lng": photo.longitude, "id": photo.pid,
         })
@@ -186,12 +187,14 @@ class TestGuessAPI:
         assert "error" in resp.get_json()
 
     def test_invalid_img_id_returns_404(self, client):
+        client.post("/api/start-round", json={"id": 99999})
         resp = client.post("/api/guess", json={
             "lat": -31.98, "lng": 115.81, "id": 99999,
         })
         assert resp.status_code == 404
 
     def test_guess_at_zero_zero(self, client, photo):
+        client.post("/api/start-round", json={"id": photo.pid})
         resp = client.post("/api/guess", json={
             "lat": 0, "lng": 0, "id": photo.pid,
         })
@@ -200,6 +203,7 @@ class TestGuessAPI:
         assert data["score"] == 0
 
     def test_score_is_integer(self, client, photo):
+        client.post("/api/start-round", json={"id": photo.pid})
         resp = client.post("/api/guess", json={
             "lat": photo.latitude + 0.01, "lng": photo.longitude, "id": photo.pid,
         })
@@ -290,10 +294,11 @@ class TestChallengeCreateAPI:
         resp = auth_client.post("/api/challenges/create", json={"uid": user.uid})
         assert resp.status_code == 403
 
-    def test_duplicate_pending_returns_409(self, auth_client, user, user2, friendship, ten_photos):
+    def test_duplicate_pending_redirects_200(self, auth_client, user, user2, friendship, ten_photos):
         auth_client.post("/api/challenges/create", json={"uid": user2.uid})
         resp = auth_client.post("/api/challenges/create", json={"uid": user2.uid})
-        assert resp.status_code == 409
+        assert resp.status_code == 200
+        assert "redirect" in resp.get_json()
 
     # test_auto_accepts_incoming_challenge removed: login_as switching on same
     # client doesn't work with Flask-Login's request context caching.
@@ -302,6 +307,22 @@ class TestChallengeCreateAPI:
         # Only the friendship creates entries, 0 photos in DB
         resp = auth_client.post("/api/challenges/create", json={"uid": user2.uid})
         assert resp.status_code == 400
+
+    def test_block_create_if_user_finished_but_opponent_playing(self, auth_client, user, user2, friendship, ten_photos):
+        resp = auth_client.post("/api/challenges/create", json={"uid": user2.uid})
+        assert resp.status_code == 201
+        c_id = resp.get_json()["challenge_id"]
+        c = Challenge.query.get(c_id)
+        c.status = "in_progress"
+        c.challenger_ready = True
+        c.challenged_ready = True
+        c.challenger_round = 6
+        c.challenged_round = 3
+        db.session.commit()
+        
+        resp2 = auth_client.post("/api/challenges/create", json={"uid": user2.uid})
+        assert resp2.status_code == 400
+        assert "Opponent is still finishing a previous game with you." in resp2.get_json()["error"]
 
     def test_unauthenticated_rejected(self, client, user2):
         resp = client.post("/api/challenges/create", json={"uid": user2.uid})
@@ -359,12 +380,12 @@ class TestChallengeActivePollAPI:
         resp = auth_client.get("/api/challenges/active")
         assert not any(ch["id"] == c.id for ch in resp.get_json())
 
-    def test_active_excludes_when_player_finished(self, auth_client, challenge_in_progress):
+    def test_active_includes_when_player_finished(self, auth_client, challenge_in_progress):
         c = challenge_in_progress
         c.challenger_round = 6
         db.session.commit()
         resp = auth_client.get("/api/challenges/active")
-        assert not any(ch["id"] == c.id for ch in resp.get_json())
+        assert any(ch["id"] == c.id for ch in resp.get_json())
 
     def test_poll_returns_challenge_data(self, auth_client, challenge_pending):
         resp = auth_client.get(f"/api/challenges/poll/{challenge_pending.id}")
@@ -666,6 +687,20 @@ class TestChallengeLifecycle:
         resp = client.get(f"/api/challenges/poll/{cid}")
         assert resp.get_json()["status"] == "expired"
 
+    def test_in_progress_expiry_flow(self, client, user, user2, friendship, ten_photos):
+        login_as(client, user)
+        resp = client.post("/api/challenges/create", json={"uid": user2.uid})
+        cid = resp.get_json()["challenge_id"]
+
+        c = Challenge.query.get(cid)
+        c.status = "in_progress"
+        c.created_at = datetime.utcnow() - timedelta(seconds=205)
+        db.session.commit()
+
+        # Poll should mark expired
+        resp = client.get(f"/api/challenges/poll/{cid}")
+        assert resp.get_json()["status"] == "expired"
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 13. Controller  ─  add_score()
@@ -690,3 +725,75 @@ class TestControllerAddScore:
         updated = User.query.get(user.uid)
         assert updated.total_score == 7000
         assert GameResult.query.filter_by(user_id=user.uid).count() == 2
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 14. Real-time WebSockets, Security & Bug Fixes
+# ═══════════════════════════════════════════════════════════════════════════
+
+class TestSecurityAndSocketBugs:
+
+    def test_timer_validation_fails_after_elapsed_limit(self, client, photo):
+        # Call start-round to initialize session
+        resp = client.post("/api/start-round", json={"id": photo.pid})
+        assert resp.status_code == 200
+        
+        # Manually alter session using session_transaction
+        with client.session_transaction() as sess:
+            from datetime import datetime, timedelta
+            sess['round_starts'][str(photo.pid)] = (datetime.utcnow() - timedelta(seconds=25)).isoformat()
+            sess.modified = True
+            
+        # Call guess, which should reject with 400
+        resp = client.post("/api/guess", json={
+            "lat": photo.latitude,
+            "lng": photo.longitude,
+            "id": photo.pid
+        })
+        assert resp.status_code == 400
+        assert "Time limit exceeded" in resp.get_json()["error"]
+
+    def test_photo_integrity_rejects_unrelated_photo(self, auth_client, user2, friendship, ten_photos):
+        # Create a challenge
+        resp = auth_client.post("/api/challenges/create", json={"uid": user2.uid})
+        assert resp.status_code == 201
+        challenge_id = resp.get_json()["challenge_id"]
+        
+        # Get a photo ID that is not in the challenge
+        from app.models import Challenge
+        c = Challenge.query.get(challenge_id)
+        pids = c.photo_ids.split(",")
+        
+        from app.models import Photos
+        all_photos = Photos.query.all()
+        unrelated_photo = None
+        for p in all_photos:
+            if str(p.pid) not in pids:
+                unrelated_photo = p
+                break
+                
+        assert unrelated_photo is not None
+        
+        # Post a guess with that unrelated photo, passing challengeId
+        auth_client.post("/api/start-round", json={"id": unrelated_photo.pid})
+        resp = auth_client.post("/api/guess", json={
+            "lat": unrelated_photo.latitude,
+            "lng": unrelated_photo.longitude,
+            "id": unrelated_photo.pid,
+            "challengeId": challenge_id
+        })
+        assert resp.status_code == 400
+        assert "not associated with this challenge" in resp.get_json()["error"]
+
+    def test_pending_challenge_redirect_on_create(self, auth_client, user, user2, friendship, ten_photos):
+        # Create a challenge
+        resp = auth_client.post("/api/challenges/create", json={"uid": user2.uid})
+        assert resp.status_code == 201
+        challenge_id = resp.get_json()["challenge_id"]
+        
+        # Attempt to create again with same user
+        resp = auth_client.post("/api/challenges/create", json={"uid": user2.uid})
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert "redirect" in data
+        assert f"challenge_id={challenge_id}" in data["redirect"]

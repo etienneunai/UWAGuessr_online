@@ -18,6 +18,9 @@ let timerInterval = null;
 let timeRemaining = TIME_LIMIT;
 let isTimerExpired = false;
 let isSubmitting = false;
+let socket = null;
+let isGameStarted = false;
+let rematchChallengeId = null;
 
 function getCSRFToken() {
     return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
@@ -137,7 +140,7 @@ async function autoSubmitMiss() {
         var response = await fetch('/api/guess', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
-            body: JSON.stringify({ lat: 0, lng: 0, id: currentRoundData.id })
+            body: JSON.stringify({ lat: 0, lng: 0, id: currentRoundData.id, challengeId: challengeId || null })
         });
 
         var result = await response.json();
@@ -186,7 +189,6 @@ async function autoSubmitMiss() {
 
 let challengeId = null;
 let challengeData = null;
-let pollInterval = null;
 let challengeTimerInterval = null;
 let challengeTimeLeft = 180; // 3 minutes
 let gameCompleteSent = false;  // guards against double-posting on refresh
@@ -195,7 +197,142 @@ let gameCompleteSent = false;  // guards against double-posting on refresh
 
 function getChallengeIdFromUrl() {
     const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get('challengeId');
+    return urlParams.get('challengeId') || urlParams.get('challenge_id');
+}
+
+function connectSocket() {
+    if (!challengeId) return;
+    if (socket) return;
+    
+    // Connect to Socket.io server
+    socket = io();
+    window.socket = socket; // Export to global namespace
+    
+    socket.on('connect', () => {
+        if (window.DEBUG) console.log("Connected to WebSocket server");
+        // Join the challenge room
+        socket.emit('join_challenge', { challenge_id: challengeId });
+        
+        // Also join the global user room to receive rematch requests
+        if (window.current_user_id) {
+            socket.emit('join_global', { user_id: window.current_user_id });
+        }
+    });
+    
+    socket.on('disconnect', () => {
+        if (window.DEBUG) console.log("Disconnected from WebSocket server");
+    });
+    
+    // Listen for events
+    socket.on('ready_update', (data) => {
+        challengeData = data;
+        updateChallengeUI();
+    });
+    
+    socket.on('status_update', (data) => {
+        challengeData = data;
+        updateChallengeUI();
+        
+        if (challengeData.status === 'in_progress') {
+            // Stop timers
+            if (challengeTimerInterval) clearInterval(challengeTimerInterval);
+            
+            var startBtnText = document.getElementById('start-btn-text');
+            var startBtn = document.getElementById('btn-start-game');
+            if (startBtn) startBtn.disabled = true;
+            if (startBtnText) startBtnText.innerText = 'Starting now...';
+            if (!isGameStarted) {
+                beginGame();
+            }
+        } else if (challengeData.status === 'completed') {
+            // Show Game Over screen with live results
+            updateChallengeGameOverDisplay(challengeData);
+        }
+    });
+
+    socket.on('new_challenge', (data) => {
+        if (window.DEBUG) console.log("New challenge/rematch received:", data);
+        if (data.id && challengeData) {
+            // Check if this new challenge is from the current opponent
+            fetch(`/api/challenges/poll/${data.id}`)
+            .then(res => res.json())
+            .then(newChallenge => {
+                const opponentUid = challengeData.challenger_id == window.current_user_id ? challengeData.challenged_id : challengeData.challenger_id;
+                if (newChallenge.challenger_id == opponentUid) {
+                    rematchChallengeId = data.id; // Store the rematch ID
+                    const statusEl = document.getElementById('final-status');
+                    if (statusEl) {
+                        statusEl.innerText = `${newChallenge.challenger_username} requested a rematch!`;
+                        statusEl.style.color = '#ffc107';
+                    }
+                    const playAgainBtn = document.getElementById('play-again-btn');
+                    if (playAgainBtn) {
+                        playAgainBtn.innerText = 'Accept Rematch';
+                        playAgainBtn.className = 'btn btn-outline-warning px-4 py-2 bangers-font';
+                        playAgainBtn.style.background = '';
+                        playAgainBtn.style.color = '';
+                    }
+                }
+            })
+            .catch(err => {
+                if (window.DEBUG) console.error("Failed to fetch rematch details:", err);
+            });
+        }
+    });
+    
+    socket.on('opponent_progress', (data) => {
+        if (window.DEBUG) console.log("Opponent progress received:", data);
+        if (challengeData) {
+            const isChallenger = challengeData.challenger_id === window.current_user_id;
+            if (isChallenger) {
+                challengeData.challenged_round = data.round;
+                challengeData.challenged_score = data.score;
+            } else {
+                challengeData.challenger_round = data.round;
+                challengeData.challenger_score = data.score;
+            }
+            updateChallengeGameOverDisplay(challengeData);
+        }
+    });
+    
+    socket.on('opponent_disconnected', (data) => {
+        if (window.DEBUG) console.log("Opponent disconnected:", data);
+        // Display a brief notification/alert to the player
+        const statusEl = document.getElementById('opponent-status');
+        if (statusEl) {
+            statusEl.innerText = `${data.username} disconnected.`;
+            statusEl.style.color = '#dc3545';
+        }
+        const finalStatusEl = document.getElementById('final-status');
+        if (finalStatusEl && finalStatusEl.classList.contains('is-waiting')) {
+            finalStatusEl.innerText = `${data.username} disconnected.`;
+            finalStatusEl.style.color = '#dc3545';
+        }
+    });
+    
+    socket.on('opponent_reconnected', (data) => {
+        if (window.DEBUG) console.log("Opponent reconnected:", data);
+        if (challengeData && challengeData.status !== 'in_progress') {
+            updateChallengeUI();
+        } else {
+            const statusEl = document.getElementById('opponent-status');
+            if (statusEl) {
+                statusEl.innerText = `${data.username} reconnected.`;
+                statusEl.style.color = '#28a745';
+            }
+            const finalStatusEl = document.getElementById('final-status');
+            if (finalStatusEl && finalStatusEl.classList.contains('is-waiting')) {
+                finalStatusEl.innerText = `${data.username} reconnected.`;
+                finalStatusEl.style.color = '#28a745';
+            }
+        }
+    });
+    
+    socket.on('challenge_rejected', (data) => {
+        if (window.DEBUG) console.log("Challenge rejected:", data);
+        alert("Your opponent has declined the challenge.");
+        window.location.href = '/dashboard';
+    });
 }
 
 async function initChallenge() {
@@ -216,7 +353,19 @@ async function initChallenge() {
             // Player already finished — restore the game-over screen
             totalScore = myScore || 0;
             showGameOver(false);
+            if (challenge.status !== 'completed') {
+                connectSocket();
+            }
             return 'completed';
+        }
+
+        if (challenge.status === 'in_progress' && myRound > 0 && myRound < 6) {
+            connectSocket();
+            return {
+                status: 'in_progress_rejoin',
+                myRound: myRound,
+                myScore: myScore || 0
+            };
         }
     } catch (e) {
         if (window.DEBUG) console.error("Failed to check initial challenge status:", e);
@@ -227,7 +376,7 @@ async function initChallenge() {
     document.getElementById('game-status-text').innerText = '';
 
     startChallengeTimer();
-    startPolling();
+    connectSocket();
 }
 
 function startChallengeTimer() {
@@ -239,46 +388,6 @@ function startChallengeTimer() {
             window.location.href = '/dashboard';
         }
     }, 1000);
-}
-
-function startPolling() {
-    pollInterval = setInterval(async () => {
-        try {
-            const resp = await fetch(`/api/challenges/poll/${challengeId}`);
-            challengeData = await resp.json();
-
-            // Safety: if this player finished while polling (e.g. page refresh
-            // mid-game but after scoring), jump straight to the completion screen.
-            const isChallenger = challengeData.challenger_id === window.current_user_id;
-            const myScore = isChallenger ? challengeData.challenger_score : challengeData.challenged_score;
-            const myRound = isChallenger ? challengeData.challenger_round : challengeData.challenged_round;
-            if (challengeData.status === 'completed' || myRound >= 6) {
-                clearInterval(pollInterval);
-                clearInterval(challengeTimerInterval);
-                totalScore = myScore || 0;
-                showGameOver(false);
-                return;
-            }
-
-            updateChallengeUI();
-
-            if (challengeData.status === 'in_progress') {
-                clearInterval(pollInterval);
-                clearInterval(challengeTimerInterval);
-                var startBtnText = document.getElementById('start-btn-text');
-                var startBtn = document.getElementById('btn-start-game');
-                if (startBtn) startBtn.disabled = true;
-                if (startBtnText) startBtnText.innerText = 'Starting now...';
-                beginGame();
-            } else if (challengeData.status === 'expired') {
-                clearInterval(pollInterval);
-                alert("This challenge has expired.");
-                window.location.href = '/dashboard';
-            }
-        } catch (e) {
-            if (window.DEBUG) console.error("Polling failed", e);
-        }
-    }, 3000);
 }
 
 function updateChallengeUI() {
@@ -340,8 +449,13 @@ async function startGame() {
         return;
     }
 
-    currentRoundIndex = 0;
-    totalScore = 0;
+    if (challengeResult && challengeResult.status === 'in_progress_rejoin') {
+        currentRoundIndex = challengeResult.myRound - 1;
+        totalScore = challengeResult.myScore;
+    } else {
+        currentRoundIndex = 0;
+        totalScore = 0;
+    }
     activeRounds = images;
 
     if (challengeId) {
@@ -349,7 +463,16 @@ async function startGame() {
         var spinner = document.getElementById('map-spinner');
         if (spinner) spinner.style.display = '';
         initMap();
-        loadPanorama(activeRounds[0].imagePath);
+        loadPanorama(activeRounds[currentRoundIndex].imagePath);
+
+        if (challengeResult && challengeResult.status === 'in_progress_rejoin') {
+            isGameStarted = true;
+            document.getElementById('challenge-waiting-room').style.display = 'none';
+            document.getElementById('game-start-overlay').style.display = 'none';
+            document.getElementById('game-board').style.display = 'block';
+            document.getElementById('game-over').style.display = 'none';
+            loadNextRound(true);
+        }
         return;
     }
 
@@ -370,11 +493,11 @@ function beginGame() {
     if (!activeRounds || activeRounds.length === 0) {
         return;
     }
+    isGameStarted = true;
     document.getElementById('game-start-overlay').style.display = 'none';
     if (challengeId) {
         document.getElementById('game-board').style.display = 'block';
         document.getElementById('game-over').style.display = 'none';
-        loadPanorama(activeRounds[0].imagePath);
         loadNextRound(false);
     }
     startTimer();
@@ -388,6 +511,18 @@ function loadNextRound(startTimerImmediately = true) {
         showGameOver();
         return;
     }
+
+    // Notify server of round start for server-side timer validation
+    fetch('/api/start-round', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCSRFToken()
+        },
+        body: JSON.stringify({ id: currentRoundData.id })
+    }).catch(e => {
+        if (window.DEBUG) console.error("Failed to start round on server:", e);
+    });
 
     // Update UI
     document.getElementById('round-counter').innerText = `Round ${currentRoundIndex + 1} / ${activeRounds.length}`;
@@ -449,7 +584,8 @@ async function submitGuess() {
             body: JSON.stringify({
                 lat: guessLat,
                 lng: guessLng,
-                id: currentRoundData.id
+                id: currentRoundData.id,
+                challengeId: challengeId || null
             })
         });
 
@@ -611,29 +747,21 @@ function showGameOver(shouldSubmitCompletion = true) {
 
     var playAgainBtn = document.getElementById('play-again-btn');
     if (playAgainBtn) {
-        playAgainBtn.style.display = challengeId ? 'none' : '';
+        playAgainBtn.style.display = '';
     }
     
     if (challengeId) {
-        // Fetch fresh data before initial display (challengeData is stale from game start)
-        if (pollInterval) clearInterval(pollInterval);
-
-        const pollNow = async () => {
+        // Fetch fresh data once (challengeData is stale from game start)
+        const fetchOnce = async () => {
             try {
                 const resp = await fetch(`/api/challenges/poll/${challengeId}`);
                 challengeData = await resp.json();
                 updateChallengeGameOverDisplay(challengeData);
-
-                if (challengeData.result) {
-                    clearInterval(pollInterval);
-                }
             } catch (e) {
-                if (window.DEBUG) console.error("GameOver polling failed", e);
+                if (window.DEBUG) console.error("GameOver initial fetch failed", e);
             }
         };
-
-        pollNow();
-        pollInterval = setInterval(pollNow, 3000);
+        fetchOnce();
     } else {
         // Solo mode: centred score, no labels — the score IS the title
         document.getElementById('final-score-box').style.display = 'none';
@@ -714,6 +842,12 @@ function zoomPhoto(scaleFactor) {
 
 async function updateProgress(roundNum, score) {
     if (!challengeId) return;
+    
+    // Emit over socket for instant updates
+    if (socket && socket.connected) {
+        socket.emit('score_update', { challenge_id: challengeId, round: roundNum, score: score });
+    }
+    
     try {
         await fetch('/api/challenges/update-progress', {
             method: 'POST',
@@ -734,10 +868,79 @@ function resetPhotoTransform() {
     panoViewer.setHfov(DEFAULT_HFOV);
 }
 
+// Rematch button handler
+var playAgainBtn = document.getElementById('play-again-btn');
+if (playAgainBtn) {
+    playAgainBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        if (challengeId) {
+            if (rematchChallengeId) {
+                // Accept the rematch
+                playAgainBtn.disabled = true;
+                playAgainBtn.innerText = 'Joining...';
+                
+                fetch('/api/challenges/respond', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken()
+                    },
+                    body: JSON.stringify({ id: rematchChallengeId, action: 'accept' })
+                })
+                .then(res => res.json())
+                .then(resp => {
+                    window.location.href = `/game?challengeId=${rematchChallengeId}`;
+                })
+                .catch(err => {
+                    playAgainBtn.disabled = false;
+                    playAgainBtn.innerText = 'Accept Rematch';
+                    alert('Could not accept rematch.');
+                });
+            } else {
+                // Request a rematch
+                if (!challengeData) {
+                    alert('Loading game data, please try again...');
+                    return;
+                }
+                const opponentUid = challengeData.challenger_id == window.current_user_id ? challengeData.challenged_id : challengeData.challenger_id;
+                
+                playAgainBtn.disabled = true;
+                playAgainBtn.innerText = 'Requesting...';
+                
+                fetch('/api/challenges/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken()
+                    },
+                    body: JSON.stringify({ uid: opponentUid })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.redirect) {
+                        window.location.href = data.redirect;
+                    } else if (data.challenge_id) {
+                        window.location.href = `/game?challengeId=${data.challenge_id}`;
+                    } else {
+                        playAgainBtn.disabled = false;
+                        playAgainBtn.innerText = 'Play Again';
+                    }
+                })
+                .catch(err => {
+                    playAgainBtn.disabled = false;
+                    playAgainBtn.innerText = 'Play Again';
+                    alert('Could not start rematch.');
+                });
+            }
+        } else {
+            window.location.href = '/game';
+        }
+    });
+}
+
 // Initialize on page load
 window.addEventListener('load', startGame);
 
 window.addEventListener('beforeunload', function () {
-    if (pollInterval) clearInterval(pollInterval);
     if (challengeTimerInterval) clearInterval(challengeTimerInterval);
 });

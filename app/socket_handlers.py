@@ -52,6 +52,9 @@ def handle_join_challenge(data):
     room = f"challenge_{challenge_id}"
     join_room(room)
     
+    # Emit player reconnected event
+    emit('opponent_reconnected', {'user_id': current_user.uid, 'username': current_user.username}, room=room, include_self=False)
+    
     # Update tracking
     sid = request.sid
     if sid in sid_to_user:

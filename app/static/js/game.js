@@ -308,6 +308,24 @@ function connectSocket() {
         }
     });
     
+    socket.on('opponent_reconnected', (data) => {
+        if (window.DEBUG) console.log("Opponent reconnected:", data);
+        if (challengeData && challengeData.status !== 'in_progress') {
+            updateChallengeUI();
+        } else {
+            const statusEl = document.getElementById('opponent-status');
+            if (statusEl) {
+                statusEl.innerText = `${data.username} reconnected.`;
+                statusEl.style.color = '#28a745';
+            }
+            const finalStatusEl = document.getElementById('final-status');
+            if (finalStatusEl && finalStatusEl.classList.contains('is-waiting')) {
+                finalStatusEl.innerText = `${data.username} reconnected.`;
+                finalStatusEl.style.color = '#28a745';
+            }
+        }
+    });
+    
     socket.on('challenge_rejected', (data) => {
         if (window.DEBUG) console.log("Challenge rejected:", data);
         alert("Your opponent has declined the challenge.");

@@ -49,7 +49,19 @@ UWAGuessr_online/
 
 ---
 
-## **3. CODING CONVENTIONS**
+## **3. DATABASE SCHEMA**
+
+| Table | Major Columns | Description |
+|-------|---------------|-------------|
+| **`user`** | `uid`, `username`, `email`, `password_hash`, `security_question`, `security_answer_hash`, `total_score`, `is_admin` | Core identity and aggregate progression. |
+| **`friendship`** | `id`, `requester_id`, `receiver_id`, `status` | Maps relationships (`pending`, `accepted`, `rejected`). |
+| **`photos`** | `pid`, `image_path`, `latitude`, `longitude`, `timestamp` | Photo metadata. `image_path` points to a WebP asset. |
+| **`game_results`** | `sid`, `user_id`, `score`, `timestamp` | Tracks individual game history for the dashboard. |
+| **`challenges`** | `id`, `challenger_id`, `challenged_id`, `photo_ids`, `status`, `challenger_ready`, `challenged_ready`, `challenger_score`, `challenged_score`, `challenger_round`, `challenged_round` | State machine for 1v1 asynchronous games. |
+
+---
+
+## **4. CODING CONVENTIONS**
 
 | Aspect | Convention |
 |--------|-----------|
@@ -61,7 +73,7 @@ UWAGuessr_online/
 
 ---
 
-## **4. CORE DOMAIN LOGIC**
+## **5. CORE DOMAIN LOGIC**
 
 ### **Scoring & Game Flow (app/game_logic.py & static/js/game.js)**
 - **Rounds**: 5 rounds per game.
@@ -75,20 +87,57 @@ UWAGuessr_online/
 
 ### **Social & Challenges (app/models.py)**
 - **Friendships**: Three states: `pending`, `accepted`, `rejected`.
-- **Challenges**: Allows a user to challenge a friend using the same set of 5 photos. Tracks rounds/scores for both players.
+- **Challenges**: Allows a user to challenge a friend using the same set of 5 photos. Tracks rounds/scores for both players. Uses HTTP polling for syncing game state between players.
 
 ---
 
-## **5. API ENDPOINTS REFERENCE**
+## **6. API ENDPOINTS REFERENCE**
 
-- `POST /api/guess`: Submits a lat/lng guess. Returns score, actual coords, and distance.
-- `GET /api/game-images`: Returns a randomized set of 5 photos (or specific ones if `challengeId` provided).
-- `GET /api/dashboard-stats`: Returns summary of games, best score, and recent trend.
-- `GET /api/leaderboard`: Returns top 10 players based on `total_score`.
+### **Game & Leaderboard**
+- `GET /api/game-images`: Returns 5 photos (random or via `challengeId`).
+- `POST /api/guess`: Submits guess. Returns score and actual coords.
+- `POST /api/game-complete`: Finalizes game; updates `total_score`. Handles `challengeId`.
+- `GET /api/leaderboard`: Top 10 by `total_score` (Daily/All-time).
+
+### **Social & Multiplayer**
+- `GET /api/friends`: List of accepted friends.
+- `GET /api/friends/search?q=query`: Search users by username.
+- `POST /api/friends/request`: Send friend request (`uid`).
+- `POST /api/friends/respond`: Accept/Reject request.
+- `POST /api/challenges/create`: Start challenge with friend (`uid`).
+- `GET /api/challenges/active`: List of pending/in-progress challenges.
+- `GET /api/challenges/poll/<id>`: Polling endpoint for real-time progress syncing.
+- `POST /api/challenges/update-progress`: Syncs round/score during a challenge.
+
+### **Admin & Assets**
+- `POST /api/upload-images`: Batch upload to temp storage; returns extracted GPS.
+- `POST /api/confirm-image`: Finalizes upload: WebP conversion, EXIF stripping, DB/JSON sync.
+- `GET /api/photos`: List all registered photos.
+- `POST /api/photos/<pid>/update-location`: Adjust lat/lng for a photo.
+- `POST /api/photos/<pid>/delete`: Remove photo record and WebP asset.
 
 ---
 
-## **6. DEVELOPMENT WORKFLOW**
+## **7. MULTIPLAYER & CHALLENGES**
+
+- **Asynchronous Flow**: Challenges are created as `pending`. Once the challenged friend accepts and both sides mark `ready`, the status moves to `in_progress`.
+- **Syncing**: The frontend ([friends.js](app/static/js/friends.js)) uses long-polling via `/api/challenges/poll` to track opponent progress.
+- **Scoring**: Both players play the **exact same set of 5 photos**. The winner is determined once both reach round 6 (completed).
+- **Expiration**: Challenges in `pending` or `ready_waiting` states expire after 3 minutes of inactivity.
+
+---
+
+## **8. IMAGE UPLOAD & ASSET MANAGEMENT**
+
+- **Workflow**: Upload (temp) ➔ GPS Extraction (EXIF) ➔ Admin Confirmation (preview/adjust) ➔ WebP Conversion ➔ DB Record ➔ JSON Sync.
+- **Storage**:
+    - `instance/uploads/`: Temporary storage for original files during extraction.
+    - `app/static/game/photos/`: Production WebP assets (metadata-stripped).
+- **Source of Truth**: [photos.json](photos.json) acts as a portable seed file for photo metadata. Any DB change (add/delete/update) triggers a sync to this file.
+
+---
+
+## **9. DEVELOPMENT WORKFLOW**
 
 ### **Database Management**
 - **Migration**: `flask db migrate -m "change description"`
@@ -101,7 +150,7 @@ UWAGuessr_online/
 
 ---
 
-## **7. AGENT INSTRUCTIONS**
+## **10. AGENT INSTRUCTIONS**
 
 - **Privacy**: **NEVER** expose the original source photos in `instance/uploads` to the client. Only serve via `app/static/game/photos` after WebP conversion and EXIF stripping in `image_upload.py`.
 - **Front-end State**: `game.js` manages global state for active games. Do not bypass `game_logic.py` for scoring calculations.

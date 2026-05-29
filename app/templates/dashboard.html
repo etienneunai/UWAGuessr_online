@@ -35,8 +35,8 @@
                             {% if profile_user is defined %}
                                 {% if current_user.is_authenticated and current_user.uid != viewed_user.uid %}
                                     {% if friendship_status == 'friends' %}
-                                    <button class="btn btn-outline-warning bangers-font" disabled>
-                                        Already Friends
+                                    <button id="remove-friend-btn" class="btn btn-outline-danger bangers-font" data-uid="{{ viewed_user.uid }}">
+                                        Remove Friend
                                     </button>
                                     {% elif friendship_status == 'sent' %}
                                     <button class="btn btn-outline-warning bangers-font" disabled>

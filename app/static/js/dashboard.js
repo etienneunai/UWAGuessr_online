@@ -142,4 +142,29 @@ $(function () {
             }
         });
     });
+
+    // ── Remove Friend button ──────────────────────────────────────────
+    $(document).on('click', '#remove-friend-btn', function () {
+        const uid = $(this).data('uid');
+        const $btn = $(this);
+        if (!confirm('Are you sure you want to remove this friend?')) {
+            return;
+        }
+        $btn.prop('disabled', true).text('Removing...');
+
+        $.ajax({
+            url: '/api/friends/remove',
+            method: 'POST',
+            contentType: 'application/json',
+            headers: { 'X-CSRFToken': getCSRFToken() },
+            data: JSON.stringify({ uid: uid }),
+            success: function () {
+                window.location.reload();
+            },
+            error: function (xhr) {
+                $btn.prop('disabled', false).text('Remove Friend');
+                alert(xhr.responseJSON?.error || 'Something went wrong');
+            }
+        });
+    });
 });

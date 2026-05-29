@@ -909,6 +909,39 @@ def api_respond_friend_request():
 
         return jsonify({'message': 'Friend request rejected'})
 
+@app.route("/api/friends/remove", methods=["POST"])
+@login_required
+def api_remove_friend():
+    from app.models import Friendship
+    from app import db
+    data = request.get_json()
+    friend_uid = data.get('uid')
+
+    if not friend_uid:
+        return jsonify({'error': 'Missing friend ID'}), 400
+
+    friend = User.query.get(friend_uid)
+    if not friend:
+        return jsonify({'error': 'Friend not found'}), 404
+
+    friendship = Friendship.query.filter(
+        ((Friendship.requester_id == current_user.uid) & (Friendship.receiver_id == friend.uid) & (Friendship.status == 'accepted')) |
+        ((Friendship.requester_id == friend.uid) & (Friendship.receiver_id == current_user.uid) & (Friendship.status == 'accepted'))
+    ).first()
+
+    if not friendship:
+        return jsonify({'error': 'Friendship not found'}), 404
+
+    db.session.delete(friendship)
+    db.session.commit()
+
+    # Emit socket events to update the friend lists in real-time
+    from app import socketio
+    socketio.emit('friend_list_update', room=f"user_{current_user.uid}")
+    socketio.emit('friend_list_update', room=f"user_{friend.uid}")
+
+    return jsonify({'message': f'Removed {friend.username} from friends'})
+
 if __name__ == "__main__":
     app.run(debug=True)
 

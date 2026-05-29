@@ -1,5 +1,7 @@
 # UWAGuessr
 
+Fork from the project repo to improve the website and deploy it.
+
 | Student ID | Name                       | Github Account                                               |
 | ---------- | -------------------------- | ------------------------------------------------------------ |
 | 24149137   | Mathew Nedumpurath Tomy    | [mathewtomy973-pixel](https://github.com/mathewtomy973-pixel) |

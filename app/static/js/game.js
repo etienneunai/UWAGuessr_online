@@ -268,8 +268,9 @@ function connectSocket() {
                     const playAgainBtn = document.getElementById('play-again-btn');
                     if (playAgainBtn) {
                         playAgainBtn.innerText = 'Accept Rematch';
-                        playAgainBtn.style.background = '#28a745';
-                        playAgainBtn.style.color = '#fff';
+                        playAgainBtn.className = 'btn btn-outline-warning px-4 py-2 bangers-font';
+                        playAgainBtn.style.background = '';
+                        playAgainBtn.style.color = '';
                     }
                 }
             })

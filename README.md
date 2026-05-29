@@ -80,7 +80,7 @@ python -m pytest tests/test_selenium_auth.py
 * **Scoring & Feedback:** Real-time distance calculation between the guess and the actual location, including visual reveals of the correct spot.
 * **User Profiles:** Dedicated profile pages to track past game history and individual performance metrics.
 * **Global Leaderboard:** A competitive ranking system to compare scores with other players.
-* **Social Challenges:** Ability to send friends challenges and play a semi-realtime game using HTTP polling for syncing.
+* **Social Challenges:** Ability to send friends challenges and play a real-time game using Socket.IO WebSockets for syncing round progress, ready statuses, and live spectating outcomes.
 * **Admin Dashboard:** Tools for system administrators to manage users and for game admins to upload/delete campus photos without writing code.
 
 ## Site Structure
@@ -98,4 +98,5 @@ python -m pytest tests/test_selenium_auth.py
 * **Backend:** Flask (Python)
 * **Database:** SQLite (via SQLAlchemy)
 * **Map API:** MazeMap (Mapbox GL-based)
+* **Real-time Sync:** Socket.IO (WebSockets)
 

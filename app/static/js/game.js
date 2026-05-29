@@ -20,6 +20,7 @@ let isTimerExpired = false;
 let isSubmitting = false;
 let socket = null;
 let isGameStarted = false;
+let rematchChallengeId = null;
 
 function getCSRFToken() {
     return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
@@ -255,8 +256,9 @@ function connectSocket() {
             fetch(`/api/challenges/poll/${data.id}`)
             .then(res => res.json())
             .then(newChallenge => {
-                const opponentUid = challengeData.challenger_id === window.current_user_id ? challengeData.challenged_id : challengeData.challenger_id;
-                if (newChallenge.challenger_id === opponentUid) {
+                const opponentUid = challengeData.challenger_id == window.current_user_id ? challengeData.challenged_id : challengeData.challenger_id;
+                if (newChallenge.challenger_id == opponentUid) {
+                    rematchChallengeId = data.id; // Store the rematch ID
                     const statusEl = document.getElementById('final-status');
                     if (statusEl) {
                         statusEl.innerText = `${newChallenge.challenger_username} requested a rematch!`;
@@ -265,35 +267,8 @@ function connectSocket() {
                     const playAgainBtn = document.getElementById('play-again-btn');
                     if (playAgainBtn) {
                         playAgainBtn.innerText = 'Accept Rematch';
-                        playAgainBtn.classList.remove('btn-game-action');
-                        playAgainBtn.classList.add('btn-success');
-                        playAgainBtn.onclick = null;
-                        
-                        // Override click to accept the rematch
-                        playAgainBtn.onclick = function(e) {
-                            e.preventDefault();
-                            playAgainBtn.disabled = true;
-                            playAgainBtn.innerText = 'Joining...';
-                            
-                            // Accept the challenge
-                            fetch('/api/challenges/respond', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'X-CSRFToken': getCSRFToken()
-                                },
-                                body: JSON.stringify({ id: data.id, action: 'accept' })
-                            })
-                            .then(res => res.json())
-                            .then(resp => {
-                                window.location.href = `/game?challengeId=${data.id}`;
-                            })
-                            .catch(err => {
-                                playAgainBtn.disabled = false;
-                                playAgainBtn.innerText = 'Accept Rematch';
-                                alert('Could not accept rematch.');
-                            });
-                        };
+                        playAgainBtn.style.background = '#28a745';
+                        playAgainBtn.style.color = '#fff';
                     }
                 }
             })
@@ -877,35 +852,66 @@ function resetPhotoTransform() {
 var playAgainBtn = document.getElementById('play-again-btn');
 if (playAgainBtn) {
     playAgainBtn.addEventListener('click', function(e) {
-        if (challengeId && challengeData) {
-            e.preventDefault();
-            const opponentUid = challengeData.challenger_id === window.current_user_id ? challengeData.challenged_id : challengeData.challenger_id;
-            
-            playAgainBtn.disabled = true;
-            playAgainBtn.innerText = 'Requesting...';
-            
-            fetch('/api/challenges/create', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCSRFToken()
-                },
-                body: JSON.stringify({ uid: opponentUid })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.redirect) {
-                    window.location.href = data.redirect;
-                } else {
+        e.preventDefault();
+        if (challengeId) {
+            if (rematchChallengeId) {
+                // Accept the rematch
+                playAgainBtn.disabled = true;
+                playAgainBtn.innerText = 'Joining...';
+                
+                fetch('/api/challenges/respond', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken()
+                    },
+                    body: JSON.stringify({ id: rematchChallengeId, action: 'accept' })
+                })
+                .then(res => res.json())
+                .then(resp => {
+                    window.location.href = `/game?challengeId=${rematchChallengeId}`;
+                })
+                .catch(err => {
+                    playAgainBtn.disabled = false;
+                    playAgainBtn.innerText = 'Accept Rematch';
+                    alert('Could not accept rematch.');
+                });
+            } else {
+                // Request a rematch
+                if (!challengeData) {
+                    alert('Loading game data, please try again...');
+                    return;
+                }
+                const opponentUid = challengeData.challenger_id == window.current_user_id ? challengeData.challenged_id : challengeData.challenger_id;
+                
+                playAgainBtn.disabled = true;
+                playAgainBtn.innerText = 'Requesting...';
+                
+                fetch('/api/challenges/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken()
+                    },
+                    body: JSON.stringify({ uid: opponentUid })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.redirect) {
+                        window.location.href = data.redirect;
+                    } else {
+                        playAgainBtn.disabled = false;
+                        playAgainBtn.innerText = 'Play Again';
+                    }
+                })
+                .catch(err => {
                     playAgainBtn.disabled = false;
                     playAgainBtn.innerText = 'Play Again';
-                }
-            })
-            .catch(err => {
-                playAgainBtn.disabled = false;
-                playAgainBtn.innerText = 'Play Again';
-                alert('Could not start rematch.');
-            });
+                    alert('Could not start rematch.');
+                });
+            }
+        } else {
+            window.location.href = '/game';
         }
     });
 }

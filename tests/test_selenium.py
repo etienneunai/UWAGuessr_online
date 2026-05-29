@@ -107,7 +107,11 @@ class SeleniumTests(unittest.TestCase):
         
         
         self.driver.find_element(By.ID, "signinBtn").click()
-        time.sleep(1.0)
+        # Wait until redirected away from the login page to avoid race conditions
+        for _ in range(10):
+            if "/login" not in self.driver.current_url:
+                break
+            time.sleep(0.5)
 
     def test_challenge_rejoin_game_starts_at_correct_round(self):
         # 1. Log in the user

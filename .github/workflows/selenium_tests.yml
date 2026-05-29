@@ -1,0 +1,42 @@
+name: Manual Selenium E2E Tests
+
+# The workflow_dispatch trigger allows you to run this manually from the Actions tab
+on: workflow_dispatch
+
+jobs:
+  ui-testing:
+    runs-on: ubuntu-latest
+
+    # Set up dummy environment variables so Flask doesn't crash missing its .env file
+    env:
+      FLASK_APP: app.py  # Change this if your main file is named differently
+      FLASK_ENV: testing
+      SECRET_KEY: "super-secret-ci-testing-key" 
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.12" # Matches one of your main pipeline versions
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        # Ensure selenium is either in requirements.txt or installed here
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        pip install pytest selenium webdriver-manager
+
+    - name: Start Flask server in background
+      run: |
+        # The '&' at the end pushes the server to run in the background
+        flask run --port=5000 &
+        
+        # Pause for 3 seconds to give the server time to fully boot up
+        sleep 3 
+
+    - name: Run Selenium Tests
+      run: |
+        # Only target the specific Selenium files
+        pytest tests/test_selenium.py tests/test_selenium_auth.py

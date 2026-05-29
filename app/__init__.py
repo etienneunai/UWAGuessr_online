@@ -5,6 +5,9 @@ from app.config import Config
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
 from flask_socketio import SocketIO
+import os
+import sys
+
 
 app = Flask(__name__)
 csrf = CSRFProtect()
@@ -15,7 +18,11 @@ migrate = Migrate(app, db)
 login = LoginManager(app)
 login.login_view = 'login'
 
-socketio = SocketIO(app)
+
+is_testing = 'pytest' in sys.modules or 'unittest' in sys.modules or os.environ.get('FLASK_ENV') == 'testing'
+async_mode = 'threading' if is_testing else None
+
+socketio = SocketIO(app, async_mode=async_mode)
 
 @login.user_loader
 def load_user(id):

@@ -555,12 +555,19 @@ def api_get_active_challenges():
     from app.models import Challenge
     from datetime import datetime, timedelta
     
-    # Check for expiration on pending/ready challenges
-    expiry_limit = datetime.utcnow() - timedelta(minutes=3)
-    expired = Challenge.query.filter(
+    # Check for expiration on pending/ready/in_progress challenges
+    now = datetime.utcnow()
+    pending_ready_expired = Challenge.query.filter(
         Challenge.status.in_(['pending', 'ready_waiting']),
-        Challenge.created_at < expiry_limit
+        Challenge.created_at < now - timedelta(minutes=3)
     ).all()
+    
+    in_progress_expired = Challenge.query.filter(
+        Challenge.status == 'in_progress',
+        Challenge.created_at < now - timedelta(seconds=200)
+    ).all()
+    
+    expired = pending_ready_expired + in_progress_expired
     
     if expired:
         from app import db
@@ -589,8 +596,13 @@ def api_poll_challenge(challenge_id):
         return jsonify({'error': 'Challenge not found'}), 404
     
     # Check expiration
+    now = datetime.utcnow()
     if challenge.status in ['pending', 'ready_waiting']:
-        if datetime.utcnow() > challenge.created_at + timedelta(minutes=3):
+        if now > challenge.created_at + timedelta(minutes=3):
+            challenge.status = 'expired'
+            db.session.commit()
+    elif challenge.status == 'in_progress':
+        if now > challenge.created_at + timedelta(seconds=200):
             challenge.status = 'expired'
             db.session.commit()
             

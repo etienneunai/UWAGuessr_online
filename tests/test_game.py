@@ -687,6 +687,20 @@ class TestChallengeLifecycle:
         resp = client.get(f"/api/challenges/poll/{cid}")
         assert resp.get_json()["status"] == "expired"
 
+    def test_in_progress_expiry_flow(self, client, user, user2, friendship, ten_photos):
+        login_as(client, user)
+        resp = client.post("/api/challenges/create", json={"uid": user2.uid})
+        cid = resp.get_json()["challenge_id"]
+
+        c = Challenge.query.get(cid)
+        c.status = "in_progress"
+        c.created_at = datetime.utcnow() - timedelta(seconds=205)
+        db.session.commit()
+
+        # Poll should mark expired
+        resp = client.get(f"/api/challenges/poll/{cid}")
+        assert resp.get_json()["status"] == "expired"
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 13. Controller  ─  add_score()

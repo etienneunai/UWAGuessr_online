@@ -87,7 +87,7 @@ UWAGuessr_online/
 
 ### **Social & Challenges (app/models.py)**
 - **Friendships**: Three states: `pending`, `accepted`, `rejected`.
-- **Challenges**: Allows a user to challenge a friend using the same set of 5 photos. Tracks rounds/scores for both players. Uses HTTP polling for syncing game state between players.
+- **Challenges**: Allows a user to challenge a friend using the same set of 5 photos. Tracks rounds/scores for both players. Uses Socket.IO WebSockets for real-time syncing of game and social events (friend list updates, requests, rematch flows, in-game ready states, and live results updating).
 
 ---
 
@@ -104,6 +104,7 @@ UWAGuessr_online/
 - `GET /api/friends/search?q=query`: Search users by username.
 - `POST /api/friends/request`: Send friend request (`uid`).
 - `POST /api/friends/respond`: Accept/Reject request.
+- `POST /api/friends/remove`: Remove / unfriend a user (`uid`).
 - `POST /api/challenges/create`: Start challenge with friend (`uid`).
 - `GET /api/challenges/active`: List of pending/in-progress challenges.
 - `GET /api/challenges/poll/<id>`: Polling endpoint for real-time progress syncing.
@@ -121,7 +122,7 @@ UWAGuessr_online/
 ## **7. MULTIPLAYER & CHALLENGES**
 
 - **Asynchronous Flow**: Challenges are created as `pending`. Once the challenged friend accepts and both sides mark `ready`, the status moves to `in_progress`.
-- **Syncing**: The frontend ([friends.js](app/static/js/friends.js)) uses long-polling via `/api/challenges/poll` to track opponent progress.
+- **Syncing**: The application uses real-time bi-directional WebSockets via Socket.IO. Game updates, player ready states, and friendship events trigger real-time socket events (`new_challenge`, `friend_request_update`, `friend_list_update`, `ready_update`, `status_update`, `opponent_progress`, `score_update`) inside global (`user_{uid}`) and challenge-specific (`challenge_{id}`) socket rooms, completely replacing HTTP polling.
 - **Scoring**: Both players play the **exact same set of 5 photos**. The winner is determined once both reach round 6 (completed).
 - **Expiration**: Challenges in `pending` or `ready_waiting` states expire after 3 minutes of inactivity.
 

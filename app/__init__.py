@@ -15,7 +15,7 @@ migrate = Migrate(app, db)
 login = LoginManager(app)
 login.login_view = 'login'
 
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app)
 
 @login.user_loader
 def load_user(id):

@@ -160,6 +160,7 @@ class TestGameImagesAPI:
 class TestGuessAPI:
 
     def test_valid_guess_returns_score_and_distance(self, client, photo):
+        client.post("/api/start-round", json={"id": photo.pid})
         resp = client.post("/api/guess", json={
             "lat": photo.latitude, "lng": photo.longitude, "id": photo.pid,
         })
@@ -186,12 +187,14 @@ class TestGuessAPI:
         assert "error" in resp.get_json()
 
     def test_invalid_img_id_returns_404(self, client):
+        client.post("/api/start-round", json={"id": 99999})
         resp = client.post("/api/guess", json={
             "lat": -31.98, "lng": 115.81, "id": 99999,
         })
         assert resp.status_code == 404
 
     def test_guess_at_zero_zero(self, client, photo):
+        client.post("/api/start-round", json={"id": photo.pid})
         resp = client.post("/api/guess", json={
             "lat": 0, "lng": 0, "id": photo.pid,
         })
@@ -200,6 +203,7 @@ class TestGuessAPI:
         assert data["score"] == 0
 
     def test_score_is_integer(self, client, photo):
+        client.post("/api/start-round", json={"id": photo.pid})
         resp = client.post("/api/guess", json={
             "lat": photo.latitude + 0.01, "lng": photo.longitude, "id": photo.pid,
         })
@@ -757,6 +761,7 @@ class TestSecurityAndSocketBugs:
         assert unrelated_photo is not None
         
         # Post a guess with that unrelated photo, passing challengeId
+        auth_client.post("/api/start-round", json={"id": unrelated_photo.pid})
         resp = auth_client.post("/api/guess", json={
             "lat": unrelated_photo.latitude,
             "lng": unrelated_photo.longitude,

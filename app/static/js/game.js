@@ -298,6 +298,9 @@ async function initChallenge() {
             // Player already finished — restore the game-over screen
             totalScore = myScore || 0;
             showGameOver(false);
+            if (challenge.status !== 'completed') {
+                connectSocket();
+            }
             return 'completed';
         }
 

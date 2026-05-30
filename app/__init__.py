@@ -25,7 +25,7 @@ login.login_view = 'login'
 is_testing = 'pytest' in sys.modules or 'unittest' in sys.modules or os.environ.get('FLASK_ENV') == 'testing'
 async_mode = 'threading' if is_testing else None
 
-socketio = SocketIO(app, async_mode=async_mode, cors_allowed_origins="*")
+socketio = SocketIO(app, async_mode=async_mode, cors_allowed_origins="*", manage_session=False)
 
 @login.user_loader
 def load_user(id):

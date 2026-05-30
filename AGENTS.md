@@ -9,10 +9,11 @@ This file provides context and instructions for AI agents working on the UWAGues
 **Purpose:** Players explore UWA through photos and attempt to guess their exact locations on an interactive MazeMap. The application includes competitive features like leaderboards, a social friendship system, and asynchronous challenges.
 
 **Tech Stack:**
-- **Backend:** Flask 3.1.3 (Python)
-- **Database:** SQLite with SQLAlchemy ORM and Flask-Migrate (Alembic)
+- **Backend:** Flask 3.1.3 (Python), Flask-SocketIO (WebSockets), Eventlet (Async Server)
+- **Database:** SQLite (dev) / PostgreSQL (prod) with SQLAlchemy ORM and Flask-Migrate (Alembic)
 - **Frontend:** Bootstrap 5, jQuery, Mapbox GL (via MazeMap API), Pannellum (Panorama Viewer)
 - **Image Processing:** Pillow (EXIF GPS extraction, WebP conversion, metadata stripping)
+- **Storage:** Local file system (dev) / Cloudflare R2 bucket via boto3 (prod)
 - **Security:** Flask-Login, Flask-WTF, Werkzeug password hashing, CSRF protection
 - **Testing:** pytest, Selenium (E2E)
 
@@ -133,7 +134,8 @@ UWAGuessr_online/
 - **Workflow**: Upload (temp) ➔ GPS Extraction (EXIF) ➔ Admin Confirmation (preview/adjust) ➔ WebP Conversion ➔ DB Record ➔ JSON Sync.
 - **Storage**:
     - `instance/uploads/`: Temporary storage for original files during extraction.
-    - `app/static/game/photos/`: Production WebP assets (metadata-stripped).
+    - **Development:** `app/static/game/photos/` (local WebP assets).
+    - **Production:** Uploaded to Cloudflare R2 and served via `PHOTO_BASE_URL` CDN if `R2_ENABLED` is true.
 - **Source of Truth**: [photos.json](photos.json) acts as a portable seed file for photo metadata. Any DB change (add/delete/update) triggers a sync to this file.
 
 ---
@@ -148,6 +150,7 @@ UWAGuessr_online/
 ### **Admin Tasks**
 - **Promote User**: `python run.py admin-promote --username [name]`
 - **Create User**: `python run.py create-user --username [name] --email [email] --password [pass]`
+- **Migrate Images to R2**: `flask --app run migrate-photos-to-r2` (moves existing local files to Cloudflare bucket)
 
 ---
 

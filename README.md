@@ -28,7 +28,18 @@ export UWAGUESSR_SECRET_KEY="your-secret-key-here"
 export DATABASE_URL="sqlite:///app.db"
 ```
 
-`UWAGUESSR_SECRET_KEY` is required (the app will not start without it). `DATABASE_URL` defaults to `sqlite:///app.db` if not set.
+`UWAGUESSR_SECRET_KEY` is required (the app will not start without it). `DATABASE_URL` defaults to a local PostgreSQL instance in production or `sqlite:///app.db` if not set.
+
+**Optional Cloud Storage (Cloudflare R2):**
+To serve images from a Cloudflare R2 bucket instead of the local filesystem:
+```bash
+export R2_ENABLED="true"
+export R2_ENDPOINT_URL="https://<account-id>.r2.cloudflarestorage.com"
+export R2_ACCESS_KEY_ID="your-access-key"
+export R2_SECRET_ACCESS_KEY="your-secret-key"
+export R2_BUCKET_NAME="uwaguessr-photos"
+export PHOTO_BASE_URL="https://pub-<hash>.r2.dev"
+```
 
 ## Running the Server
 
@@ -97,8 +108,9 @@ python -m pytest tests/test_selenium_auth.py
 
 ## Tech Stack
 * **Frontend:** Bootstrap (HTML/CSS)
-* **Backend:** Flask (Python)
-* **Database:** SQLite (via SQLAlchemy)
+* **Backend:** Flask (Python), Flask-SocketIO
+* **Database:** SQLite (development), PostgreSQL (production) via SQLAlchemy
 * **Map API:** MazeMap (Mapbox GL-based)
-* **Real-time Sync:** Socket.IO (WebSockets)
+* **Real-time Sync:** Socket.IO (WebSockets) via Eventlet
+* **Cloud Storage:** Cloudflare R2 (optional for CDN image hosting)
 

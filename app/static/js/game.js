@@ -191,6 +191,7 @@ let challengeId = null;
 let challengeData = null;
 let challengeTimerInterval = null;
 let challengeTimeLeft = 180; // 3 minutes
+let fallbackPollingInterval = null;
 let gameCompleteSent = false;  // guards against double-posting on refresh
 
 // ── Challenge Logic ────────────────────────────────────────────────────────
@@ -377,6 +378,48 @@ async function initChallenge() {
 
     startChallengeTimer();
     connectSocket();
+    startFallbackPolling();
+}
+
+function startFallbackPolling() {
+    if (fallbackPollingInterval) return;
+    
+    fallbackPollingInterval = setInterval(async () => {
+        // If socket is connected and actively handling things, no need to poll
+        if (socket && socket.connected) {
+            clearInterval(fallbackPollingInterval);
+            fallbackPollingInterval = null;
+            return;
+        }
+        
+        if (!challengeId) return;
+        if (isGameStarted || (challengeData && challengeData.status === 'completed')) return;
+        
+        try {
+            const resp = await fetch(`/api/challenges/poll/${challengeId}`);
+            if (resp.ok) {
+                const data = await resp.json();
+                challengeData = data;
+                updateChallengeUI();
+                
+                if (challengeData.status === 'in_progress') {
+                    clearInterval(fallbackPollingInterval);
+                    fallbackPollingInterval = null;
+                    if (challengeTimerInterval) clearInterval(challengeTimerInterval);
+                    
+                    var startBtnText = document.getElementById('start-btn-text');
+                    var startBtn = document.getElementById('btn-start-game');
+                    if (startBtn) startBtn.disabled = true;
+                    if (startBtnText) startBtnText.innerText = 'Starting now...';
+                    if (!isGameStarted) {
+                        beginGame();
+                    }
+                }
+            }
+        } catch (e) {
+            if (window.DEBUG) console.error("Fallback polling failed", e);
+        }
+    }, 3000);
 }
 
 function startChallengeTimer() {

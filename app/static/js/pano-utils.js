@@ -53,6 +53,7 @@
             });
         };
 
+        tempImg.crossOrigin = "anonymous";
         tempImg.src = imageUrl;
     }
 

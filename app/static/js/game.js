@@ -418,11 +418,15 @@ async function handleStartClick() {
         startBtn.disabled = true;
         startBtnText.innerText = "Waiting on other player...";
 
-        await fetch('/api/challenges/ready', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
-            body: JSON.stringify({ id: challengeId })
-        });
+        if (socket && socket.connected) {
+            socket.emit('player_ready', { challenge_id: challengeId });
+        } else {
+            await fetch('/api/challenges/ready', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+                body: JSON.stringify({ id: challengeId })
+            });
+        }
     } else {
         var startBtn = document.getElementById('btn-start-game');
         if (startBtn) startBtn.disabled = true;
@@ -781,6 +785,10 @@ function sendGameComplete(finalScore) {
 
     const body = { totalScore: finalScore };
     if (challengeId) body.challengeId = challengeId;
+
+    if (challengeId && socket && socket.connected) {
+        socket.emit('game_complete', { challenge_id: challengeId, score: finalScore });
+    }
 
     fetch('/api/game-complete', {
         method: 'POST',

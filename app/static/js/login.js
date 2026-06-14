@@ -147,5 +147,14 @@ $(function () {
     window.location.href = "/";
   });
 
+  $("#togglePassword").on("click", function () {
+    const $pwd = $("#password");
+    if ($pwd.attr("type") === "password") {
+      $pwd.attr("type", "text");
+    } else {
+      $pwd.attr("type", "password");
+    }
+  });
+
   $("#email").trigger("focus");
 });

@@ -339,6 +339,26 @@ main {
   outline-offset: 1px;
 }
 
+.btn-toggle-password {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+}
+
+.btn-toggle-password:hover {
+  color: var(--text-light);
+}
+
 /* Buttons */
 .btn-signin {
   align-items: center;

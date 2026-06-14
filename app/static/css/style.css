@@ -1494,12 +1494,13 @@ main {
     top: 100%;
     left: 0;
     right: 0;
-    background: rgba(10, 25, 47, 0.98);
-    backdrop-filter: blur(10px);
-    height: calc(100vh - 60px);
+    background: var(--navy-nav);
     overflow-y: auto;
     text-align: center;
-    padding: 1rem 0;
+  }
+
+  #mainNav .mobile-menu-links {
+    padding-top: 1.5rem;
   }
 
   #mainNav .nav-item {

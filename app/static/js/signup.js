@@ -215,6 +215,32 @@ $(function () {
     $("#securityQuestion").trigger("focus");
   });
 
+  // Security Question Warning
+  $("#securityQuestion, #securityAnswer").on("blur", function () {
+    const q = $("#securityQuestion").val().trim();
+    const a = $("#securityAnswer").val().trim();
+    
+    if (!q && !a) return;
+
+    let isWeak = false;
+    if (q) {
+      const words = q.split(/\s+/).filter(Boolean).length;
+      if (words < 3) isWeak = true;
+    }
+    if (a) {
+      if (a.length < 8) isWeak = true;
+    }
+
+    if (isWeak) {
+      showAlert("A weak security question puts your account at risk.", "danger");
+    } else {
+      const currentAlert = $("#alertArea").text();
+      if (currentAlert.includes("weak security question")) {
+        $("#alertArea").html("");
+      }
+    }
+  });
+
   // Submit
   $("#backBtn3").on("click", function () {
     goToStep(2);

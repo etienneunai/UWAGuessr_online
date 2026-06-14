@@ -45,6 +45,19 @@ function startTimer() {
     startTime = performance.now();
     updateTimerDisplay();
 
+    if (currentRoundData && currentRoundData.id) {
+        fetch('/api/start-round', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken()
+            },
+            body: JSON.stringify({ id: currentRoundData.id })
+        }).catch(e => {
+            if (window.DEBUG) console.error("Failed to start round on server:", e);
+        });
+    }
+
     timerInterval = setInterval(function () {
         let elapsedTime = (performance.now() - startTime) / 1000;
         timeRemaining = Math.max(0, TIME_LIMIT - elapsedTime);
@@ -133,6 +146,9 @@ function handleTimerExpiry() {
 }
 
 async function autoSubmitMiss() {
+    if (isSubmitting) return;
+    isSubmitting = true;
+
     var actionBtn = document.getElementById('action-btn');
     actionBtn.disabled = true;
 
@@ -147,6 +163,7 @@ async function autoSubmitMiss() {
         if (result.error) {
             if (window.DEBUG) console.error(result.error);
             actionBtn.disabled = false;
+            isSubmitting = false;
             return;
         }
 
@@ -185,6 +202,7 @@ async function autoSubmitMiss() {
         if (window.DEBUG) console.error('Auto-submit failed:', e);
         actionBtn.disabled = false;
     }
+    isSubmitting = false;
 }
 
 let challengeId = null;
@@ -558,18 +576,6 @@ function loadNextRound(startTimerImmediately = true) {
         showGameOver();
         return;
     }
-
-    // Notify server of round start for server-side timer validation
-    fetch('/api/start-round', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCSRFToken()
-        },
-        body: JSON.stringify({ id: currentRoundData.id })
-    }).catch(e => {
-        if (window.DEBUG) console.error("Failed to start round on server:", e);
-    });
 
     // Update UI
     document.getElementById('round-counter').innerText = `Round ${currentRoundIndex + 1} / ${activeRounds.length}`;

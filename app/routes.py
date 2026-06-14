@@ -418,10 +418,11 @@ def api_confirm_image():
     # Insert into database
     new_id = add_photo_record(webp_filename, lat, lng)
 
+    from app.game_logic import _resolve_photo_url
     return jsonify({
         'success': True,
         'id': new_id,
-        'imagePath': f'/static/game/photos/{webp_filename}',
+        'imagePath': _resolve_photo_url(f'/static/game/photos/{webp_filename}'),
         'lat': lat,
         'lng': lng,
     })
@@ -429,10 +430,11 @@ def api_confirm_image():
 @app.route("/api/photos")
 def api_list_photos():
     """List all photos in the database."""
+    from app.game_logic import _resolve_photo_url
     photos = Photos.query.order_by(Photos.pid.desc()).all()
     return jsonify([{
         'pid': p.pid,
-        'image_path': p.image_path,
+        'image_path': _resolve_photo_url(p.image_path),
         'latitude': p.latitude,
         'longitude': p.longitude,
         'timestamp': p.timestamp.isoformat() if p.timestamp else None,
@@ -775,10 +777,14 @@ def api_game_complete():
                 challenge.challenged_score = total_score
                 challenge.challenged_round = 6
             
+            db.session.commit()
+
+            db.session.refresh(challenge)
+            
             # Mark completed only when both players explicitly finished.
             if (challenge.challenger_round or 0) >= 6 and (challenge.challenged_round or 0) >= 6:
                 challenge.status = 'completed'
-            db.session.commit()
+                db.session.commit()
             
             # Emit socket status_update
             from app import socketio

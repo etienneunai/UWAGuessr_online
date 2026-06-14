@@ -7,7 +7,9 @@ from flask_wtf.csrf import CSRFProtect
 from flask_socketio import SocketIO
 import os
 import sys
-
+if 'flask' not in sys.argv[0]:
+    import eventlet
+    eventlet.monkey_patch()
 
 app = Flask(__name__)
 csrf = CSRFProtect()
@@ -22,7 +24,7 @@ login.login_view = 'login'
 is_testing = 'pytest' in sys.modules or 'unittest' in sys.modules or os.environ.get('FLASK_ENV') == 'testing'
 async_mode = 'threading' if is_testing else None
 
-socketio = SocketIO(app, async_mode=async_mode)
+socketio = SocketIO(app, async_mode=async_mode, cors_allowed_origins="*", manage_session=False)
 
 @login.user_loader
 def load_user(id):

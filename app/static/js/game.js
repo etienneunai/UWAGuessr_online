@@ -45,6 +45,19 @@ function startTimer() {
     startTime = performance.now();
     updateTimerDisplay();
 
+    if (currentRoundData && currentRoundData.id) {
+        fetch('/api/start-round', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken()
+            },
+            body: JSON.stringify({ id: currentRoundData.id })
+        }).catch(e => {
+            if (window.DEBUG) console.error("Failed to start round on server:", e);
+        });
+    }
+
     timerInterval = setInterval(function () {
         let elapsedTime = (performance.now() - startTime) / 1000;
         timeRemaining = Math.max(0, TIME_LIMIT - elapsedTime);
@@ -133,6 +146,9 @@ function handleTimerExpiry() {
 }
 
 async function autoSubmitMiss() {
+    if (isSubmitting) return;
+    isSubmitting = true;
+
     var actionBtn = document.getElementById('action-btn');
     actionBtn.disabled = true;
 
@@ -147,6 +163,7 @@ async function autoSubmitMiss() {
         if (result.error) {
             if (window.DEBUG) console.error(result.error);
             actionBtn.disabled = false;
+            isSubmitting = false;
             return;
         }
 
@@ -185,12 +202,14 @@ async function autoSubmitMiss() {
         if (window.DEBUG) console.error('Auto-submit failed:', e);
         actionBtn.disabled = false;
     }
+    isSubmitting = false;
 }
 
 let challengeId = null;
 let challengeData = null;
 let challengeTimerInterval = null;
 let challengeTimeLeft = 180; // 3 minutes
+let fallbackPollingInterval = null;
 let gameCompleteSent = false;  // guards against double-posting on refresh
 
 // ── Challenge Logic ────────────────────────────────────────────────────────
@@ -377,6 +396,48 @@ async function initChallenge() {
 
     startChallengeTimer();
     connectSocket();
+    startFallbackPolling();
+}
+
+function startFallbackPolling() {
+    if (fallbackPollingInterval) return;
+    
+    fallbackPollingInterval = setInterval(async () => {
+        // If socket is connected and actively handling things, no need to poll
+        if (socket && socket.connected) {
+            clearInterval(fallbackPollingInterval);
+            fallbackPollingInterval = null;
+            return;
+        }
+        
+        if (!challengeId) return;
+        if (isGameStarted || (challengeData && challengeData.status === 'completed')) return;
+        
+        try {
+            const resp = await fetch(`/api/challenges/poll/${challengeId}`);
+            if (resp.ok) {
+                const data = await resp.json();
+                challengeData = data;
+                updateChallengeUI();
+                
+                if (challengeData.status === 'in_progress') {
+                    clearInterval(fallbackPollingInterval);
+                    fallbackPollingInterval = null;
+                    if (challengeTimerInterval) clearInterval(challengeTimerInterval);
+                    
+                    var startBtnText = document.getElementById('start-btn-text');
+                    var startBtn = document.getElementById('btn-start-game');
+                    if (startBtn) startBtn.disabled = true;
+                    if (startBtnText) startBtnText.innerText = 'Starting now...';
+                    if (!isGameStarted) {
+                        beginGame();
+                    }
+                }
+            }
+        } catch (e) {
+            if (window.DEBUG) console.error("Fallback polling failed", e);
+        }
+    }, 3000);
 }
 
 function startChallengeTimer() {
@@ -418,11 +479,15 @@ async function handleStartClick() {
         startBtn.disabled = true;
         startBtnText.innerText = "Waiting on other player...";
 
-        await fetch('/api/challenges/ready', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
-            body: JSON.stringify({ id: challengeId })
-        });
+        if (socket && socket.connected) {
+            socket.emit('player_ready', { challenge_id: challengeId });
+        } else {
+            await fetch('/api/challenges/ready', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+                body: JSON.stringify({ id: challengeId })
+            });
+        }
     } else {
         var startBtn = document.getElementById('btn-start-game');
         if (startBtn) startBtn.disabled = true;
@@ -511,18 +576,6 @@ function loadNextRound(startTimerImmediately = true) {
         showGameOver();
         return;
     }
-
-    // Notify server of round start for server-side timer validation
-    fetch('/api/start-round', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCSRFToken()
-        },
-        body: JSON.stringify({ id: currentRoundData.id })
-    }).catch(e => {
-        if (window.DEBUG) console.error("Failed to start round on server:", e);
-    });
 
     // Update UI
     document.getElementById('round-counter').innerText = `Round ${currentRoundIndex + 1} / ${activeRounds.length}`;
@@ -781,6 +834,10 @@ function sendGameComplete(finalScore) {
 
     const body = { totalScore: finalScore };
     if (challengeId) body.challengeId = challengeId;
+
+    if (challengeId && socket && socket.connected) {
+        socket.emit('game_complete', { challenge_id: challengeId, score: finalScore });
+    }
 
     fetch('/api/game-complete', {
         method: 'POST',

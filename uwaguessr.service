@@ -1,0 +1,24 @@
+[Unit]
+Description=UWAGuessr Flask Application
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=uwaguessr
+Group=uwaguessr
+WorkingDirectory=/opt/uwaguessr
+EnvironmentFile=/opt/uwaguessr/.env
+ExecStart=/opt/uwaguessr/venv/bin/gunicorn app:app \
+    --workers 1 \
+    --worker-class eventlet \
+    --timeout 120 \
+    --access-logfile - \
+    --error-logfile - \
+    --bind unix:/run/uwaguessr/gunicorn.sock
+Restart=always
+RestartSec=5
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

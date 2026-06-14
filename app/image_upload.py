@@ -66,10 +66,14 @@ def extract_gps(image_path):
 # ── WebP conversion ───────────────────────────────────────────────────────
 
 def convert_to_webp(source_path, quality=85):
-    """Convert an image to WebP, strip all EXIF, save to photos dir.
+    """Convert an image to WebP, strip all EXIF.
+    If R2_ENABLED is true, uploads to Cloudflare R2 bucket.
+    Otherwise, saves to local photos dir.
     Returns the new WebP filename (just the basename).
     """
-    os.makedirs(PHOTOS_DIR, exist_ok=True)
+    from app.config import Config
+    import io
+    
     img = Image.open(source_path)
     # Convert to RGB if necessary (WebP doesn't support all modes)
     if img.mode in ('RGBA', 'LA', 'P'):
@@ -80,25 +84,47 @@ def convert_to_webp(source_path, quality=85):
     # Preserve original filename stem but force .webp extension
     stem, _ = os.path.splitext(os.path.basename(source_path))
     webp_filename = f"{stem}.webp"
-    webp_path = os.path.join(PHOTOS_DIR, webp_filename)
 
-    img.save(webp_path, 'WEBP', quality=quality, exif=b'')
+    if Config.R2_ENABLED:
+        from app.r2_storage import upload_photo_bytes
+        buffer = io.BytesIO()
+        img.save(buffer, 'WEBP', quality=quality, exif=b'')
+        buffer.seek(0)
+        # R2 key = lstrip('/') of the canonical path
+        key = f"static/game/photos/{webp_filename}"
+        upload_photo_bytes(buffer, key)
+    else:
+        os.makedirs(PHOTOS_DIR, exist_ok=True)
+        webp_path = os.path.join(PHOTOS_DIR, webp_filename)
+        img.save(webp_path, 'WEBP', quality=quality, exif=b'')
+        
     return webp_filename
 
 
 # ── DB update ─────────────────────────────────────────────────────────────
 
 def delete_photo_record(pid):
-    """Delete a photo row and its file on disk, then re-sync JSON."""
+    """Delete a photo row, its file on disk or R2 bucket, then re-sync JSON."""
     from app.models import Photos
+    from app.config import Config
+    
     photo = Photos.query.get(pid)
     if not photo:
         return False
 
-    # Remove file from disk
-    file_path = os.path.join(BASE_DIR, photo.image_path.lstrip('/'))
-    if os.path.isfile(file_path):
-        os.remove(file_path)
+    if Config.R2_ENABLED:
+        from app.r2_storage import delete_photo_by_key
+        # R2 key is canonical path without leading slash
+        key = photo.image_path.lstrip('/')
+        try:
+            delete_photo_by_key(key)
+        except Exception as e:
+            print(f"Error deleting {key} from R2: {e}")
+    else:
+        # Remove file from disk
+        file_path = os.path.join(BASE_DIR, photo.image_path.lstrip('/'))
+        if os.path.isfile(file_path):
+            os.remove(file_path)
 
     db.session.delete(photo)
     db.session.commit()

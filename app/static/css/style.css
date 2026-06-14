@@ -1229,11 +1229,12 @@ main {
 .friends-sidebar__header button {
   min-width: 42px;
   min-height: 42px;
-  border-radius: 50%;
+  border-radius: var(--radius-md);
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.06);
   color: var(--text-light);
   font-size: 1.4rem;
+  font-weight: 700;
   flex-shrink: 0;
   box-sizing: border-box;
 }

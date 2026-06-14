@@ -111,6 +111,13 @@ $(function () {
   });
 
   // Step 1
+  $("#step-1 input").on("keydown", function (e) {
+    if (e.key === "Enter" || e.keyCode === 13) {
+      e.preventDefault();
+      $("#nextBtn1").click();
+    }
+  });
+
   $("#nextBtn1").on("click", function () {
     const username = $("#username").val().trim();
     const email = $("#email").val().trim();
@@ -157,6 +164,13 @@ $(function () {
   });
 
   // Step 2
+  $("#step-2 input").on("keydown", function (e) {
+    if (e.key === "Enter" || e.keyCode === 13) {
+      e.preventDefault();
+      $("#nextBtn2").click();
+    }
+  });
+
   $("#backBtn2").on("click", function () {
     goToStep(1);
   });

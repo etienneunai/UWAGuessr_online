@@ -1,6 +1,3 @@
-import eventlet
-eventlet.monkey_patch()
-
 from flask import Flask
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
@@ -10,7 +7,9 @@ from flask_wtf.csrf import CSRFProtect
 from flask_socketio import SocketIO
 import os
 import sys
-
+if 'flask' not in sys.argv[0]:
+    import eventlet
+    eventlet.monkey_patch()
 
 app = Flask(__name__)
 csrf = CSRFProtect()

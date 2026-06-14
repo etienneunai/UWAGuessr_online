@@ -1467,18 +1467,8 @@ main {
   }
 }
 
-@media (max-width: 991px) {
-  .custom-navbar .navbar-nav {
-    text-align: right;
-  }
-  .custom-navbar .navbar-nav .nav-item {
-    align-items: flex-end;
-    display: flex;
-    flex-direction: column;
-  }
-}
-
-@media (max-width: 640px) {
+@media (max-width: 767px) {
+  /* Typography and Leaderboard */
   .how-to-play-title {
     font-size: 40px;
   }
@@ -1497,7 +1487,46 @@ main {
     word-break: break-word;
   }
 
-  .page-signup .map-panel {
-    display: none;
+  /* Mobile Dropdown Menu */
+  #mainNav.show,
+  #mainNav.collapsing {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: rgba(10, 25, 47, 0.98);
+    backdrop-filter: blur(10px);
+    height: calc(100vh - 60px);
+    overflow-y: auto;
+    text-align: center;
+    padding: 1rem 0;
+  }
+
+  #mainNav .nav-item {
+    width: 100%;
+  }
+
+  #mainNav .nav-link {
+    font-size: 1.5rem;
+    padding: 0.75rem 1rem;
+  }
+
+  #mainNav .nav-item .btn {
+    margin: 15px auto !important;
+    display: block;
+    width: 80%;
+    max-width: 300px;
+    font-size: 1.25rem;
+  }
+
+  /* Login and Signup Mobile Tweaks */
+  .page-signup .map-panel,
+  .page-login .map-panel {
+    display: none !important;
+  }
+
+  .page-signup .page-wrap,
+  .page-login .page-wrap {
+    padding-top: 6rem !important;
   }
 }

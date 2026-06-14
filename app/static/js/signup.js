@@ -325,5 +325,15 @@ $(function () {
     window.location.href = "/game";
   });
 
+  $("#togglePassword").on("click", function () {
+    const $pwd = $("#password");
+    $pwd.attr("type", $pwd.attr("type") === "password" ? "text" : "password");
+  });
+
+  $("#toggleConfirmPassword").on("click", function () {
+    const $cpwd = $("#confirmPassword");
+    $cpwd.attr("type", $cpwd.attr("type") === "password" ? "text" : "password");
+  });
+
   $("#username").trigger("focus");
 });

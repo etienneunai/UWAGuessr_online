@@ -1468,3 +1468,14 @@ main {
     font-size: 0.7rem;
   }
 }
+
+@media (max-width: 991px) {
+  .custom-navbar .navbar-nav {
+    text-align: right;
+  }
+  .custom-navbar .navbar-nav .nav-item {
+    align-items: flex-end;
+    display: flex;
+    flex-direction: column;
+  }
+}

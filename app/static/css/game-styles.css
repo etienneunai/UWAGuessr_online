@@ -20,7 +20,8 @@ all general purpose css should be in style.css
 .page-game .game-wrapper {
     position: relative;
     width: 100vw;
-    height: calc(100vh);
+    height: 100vh;
+    height: 100dvh;
     /* Adjust based on navbar height */
     overflow: hidden;
     background-color: var(--game-wrapper-bg);

@@ -494,28 +494,6 @@ main {
   .form-panel {
     padding: 2.25rem 1.75rem;
   }
-
-  .how-to-play-title {
-    font-size: 40px;
-  }
-
-  .rank-card {
-    padding-left: 80px;
-    padding-right: 15px;
-  }
-
-  .rank-1 {
-    padding-left: 90px;
-    padding-right: 20px;
-  }
-
-  .rank-name {
-    word-break: break-word;
-  }
-
-  .page-signup .map-panel {
-    display: none;
-  }
 }
 
 .tilted-header {
@@ -1497,5 +1475,29 @@ main {
     align-items: flex-end;
     display: flex;
     flex-direction: column;
+  }
+}
+
+@media (max-width: 640px) {
+  .how-to-play-title {
+    font-size: 40px;
+  }
+
+  .rank-card {
+    padding-left: 80px;
+    padding-right: 15px;
+  }
+
+  .rank-1 {
+    padding-left: 90px;
+    padding-right: 20px;
+  }
+
+  .rank-name {
+    word-break: break-word;
+  }
+
+  .page-signup .map-panel {
+    display: none;
   }
 }

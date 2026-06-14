@@ -52,11 +52,11 @@ block body_class %}page-login{% endblock %} {% block content %}
 
       <div class="divider">or</div>
 
+      <a href="{{ url_for('signup') }}" class="btn-guest text-decoration-none mb-3">Sign up free</a>
+
       <button class="btn-guest" id="guestBtn">Continue as guest</button>
 
-      <div class="form-footer">
-        No account? <a href="{{ url_for('signup') }}">Sign up free</a>
-        &nbsp;·&nbsp;
+      <div class="form-footer mt-4">
         <a href="{{ url_for('forgot_password') }}">Forgot password?</a>
       </div>
     </div>

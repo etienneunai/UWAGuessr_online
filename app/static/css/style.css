@@ -490,6 +490,10 @@ main {
   .rank-name {
     word-break: break-word;
   }
+
+  .page-signup .map-panel {
+    display: none;
+  }
 }
 
 .tilted-header {

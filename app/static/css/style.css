@@ -472,6 +472,10 @@ main {
   .form-panel {
     padding: 2.25rem 1.75rem;
   }
+
+  .how-to-play-title {
+    font-size: 40px;
+  }
 }
 
 .tilted-header {

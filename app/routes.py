@@ -777,10 +777,14 @@ def api_game_complete():
                 challenge.challenged_score = total_score
                 challenge.challenged_round = 6
             
+            db.session.commit()
+
+            db.session.refresh(challenge)
+            
             # Mark completed only when both players explicitly finished.
             if (challenge.challenger_round or 0) >= 6 and (challenge.challenged_round or 0) >= 6:
                 challenge.status = 'completed'
-            db.session.commit()
+                db.session.commit()
             
             # Emit socket status_update
             from app import socketio

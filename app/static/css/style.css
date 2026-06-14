@@ -7,9 +7,12 @@
   --uwa-green-pale: #e1f5ee;
   --map-bg: #b8d9c2;
   --navy-900: #161246;
+  --navy-900-rgb: 22, 18, 70;
   --navy-800: #201a5f;
   --navy-overlay: rgba(22, 18, 70, 0.92);
   --navy-nav: rgba(10, 16, 40, 0.95);
+  --navy-nav-rgb: 10, 16, 40;
+  --golden-rgb: 255, 202, 44;
 
   --text-dark: #0f172a;
   --text-light: #ffffff;
@@ -22,16 +25,24 @@
   --map-bg-game: #e4edf6;
   --color-warning: #ffc107;
   --color-danger: #ff3b30;
+  --color-success: #4ade80;
+  --color-info: #38bdf8;
 
-  /* Game Page Z-Indexes */
+  /* Z-Indexes */
   --z-danger: 999;
   --z-game-ui: 1000;
+  --z-nav: 1030;
+  --z-backdrop: 1045;
+  --z-sidebar: 1050;
+  --z-toast: 1055;
   --z-modal: 2000;
 
   /* Typography */
   --font-main: "DM Sans", sans-serif;
   --font-heading: "Orbitron", sans-serif;
   --font-accent: "Bangers", cursive;
+  --font-game: "Russo One", sans-serif;
+  --font-mono: "Courier New", monospace;
 
   /* Borders & Shadows */
   --radius-md: 0.5rem;
@@ -88,7 +99,7 @@ img {
   left: 0;
   right: 0;
   width: 100%;
-  z-index: 1030;
+  z-index: var(--z-nav);
 }
 
 .custom-navbar .nav-link {
@@ -480,7 +491,7 @@ main {
 }
 
 /* --- Media Queries --- */
-@media (max-width: 640px) {
+@media (max-width: 767px) {
   .card-shell {
     flex-direction: column;
     max-width: 26.25rem;
@@ -624,12 +635,12 @@ main {
 }
 
 .rank-1 {
-  border-color: #ffd700;
+  border-color: var(--golden);
   padding: 30px 20px;
 }
 
 .rank-1 .rank-number {
-  color: #ffd700;
+  color: var(--golden);
   font-size: 3.5rem;
 }
 
@@ -775,7 +786,7 @@ main {
   color: var(--navy-900);
   padding: 15px 0;
   box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1);
-  z-index: 1000;
+  z-index: var(--z-game-ui);
 }
 
 /* --- Dashboard --- */
@@ -1015,7 +1026,7 @@ main {
   right: 1.5rem;
   top: 5.75rem;
   transform: none;
-  z-index: 1055;
+  z-index: var(--z-toast);
   width: 54px;
   height: 54px;
   border-radius: 18px;
@@ -1130,7 +1141,7 @@ main {
   transition:
     opacity 0.28s ease,
     visibility 0.28s ease;
-  z-index: 1045;
+  z-index: var(--z-backdrop);
 }
 
 .friends-backdrop.active {
@@ -1146,7 +1157,7 @@ main {
   transform: translateX(100%);
   transition: transform 0.28s ease;
   background: linear-gradient(180deg, #061126 0%, #091a38 100%);
-  z-index: 1050;
+  z-index: var(--z-sidebar);
   display: flex;
   flex-direction: column;
   padding: 1.3rem;
@@ -1375,7 +1386,7 @@ main {
   display: none;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .friends-toggle {
     right: 0.75rem;
     top: auto;
@@ -1497,6 +1508,7 @@ main {
     background: var(--navy-nav);
     overflow-y: auto;
     text-align: center;
+    max-height: calc(100vh - 60px);
   }
 
   #mainNav .mobile-menu-links {

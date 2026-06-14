@@ -101,6 +101,7 @@
         window.current_user_id = {{ current_user.uid }};
     </script>
     {% endif %}
+    <script src="{{ url_for('static', filename='js/base.js') }}"></script>
     {% block scripts %}{% endblock %}
   </body>
 

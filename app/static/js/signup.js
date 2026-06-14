@@ -111,6 +111,13 @@ $(function () {
   });
 
   // Step 1
+  $("#step-1 input").on("keydown", function (e) {
+    if (e.key === "Enter" || e.keyCode === 13) {
+      e.preventDefault();
+      $("#nextBtn1").click();
+    }
+  });
+
   $("#nextBtn1").on("click", function () {
     const username = $("#username").val().trim();
     const email = $("#email").val().trim();
@@ -157,6 +164,13 @@ $(function () {
   });
 
   // Step 2
+  $("#step-2 input").on("keydown", function (e) {
+    if (e.key === "Enter" || e.keyCode === 13) {
+      e.preventDefault();
+      $("#nextBtn2").click();
+    }
+  });
+
   $("#backBtn2").on("click", function () {
     goToStep(1);
   });
@@ -199,6 +213,32 @@ $(function () {
     }
     goToStep(3);
     $("#securityQuestion").trigger("focus");
+  });
+
+  // Security Question Warning
+  $("#securityQuestion, #securityAnswer").on("blur", function () {
+    const q = $("#securityQuestion").val().trim();
+    const a = $("#securityAnswer").val().trim();
+    
+    if (!q && !a) return;
+
+    let isWeak = false;
+    if (q) {
+      const words = q.split(/\s+/).filter(Boolean).length;
+      if (words < 3) isWeak = true;
+    }
+    if (a) {
+      if (a.length < 8) isWeak = true;
+    }
+
+    if (isWeak) {
+      showAlert("A weak security question puts your account at risk.", "danger");
+    } else {
+      const currentAlert = $("#alertArea").text();
+      if (currentAlert.includes("weak security question")) {
+        $("#alertArea").html("");
+      }
+    }
   });
 
   // Submit

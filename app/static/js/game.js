@@ -884,6 +884,8 @@ function loadPanorama(imageUrl) {
         minHfov: MIN_HFOV,
         maxHfov: MAX_HFOV,
         avoidShowingBackground: true,
+        randomizeYaw: true,
+        friction: 0.10,
         onReady: function (viewer) { panoViewer = viewer; },
     });
 }

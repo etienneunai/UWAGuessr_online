@@ -14,6 +14,7 @@
             var initialYaw = opts.randomizeYaw ? (Math.random() * 360 - 180) : (typeof opts.yaw === 'number' ? opts.yaw : 0);
             var initialHfov = typeof opts.hfov === 'number' ? opts.hfov : 85;
             var friction = typeof opts.friction === 'number' ? opts.friction : 0.15;
+            var touchPanSpeedCoeffFactor = typeof opts.touchPanSpeedCoeffFactor === 'number' ? opts.touchPanSpeedCoeffFactor : 1.0;
 
             var viewerOptions = {
                 type: 'equirectangular',
@@ -32,6 +33,7 @@
                 mouseZoom: true,
                 avoidShowingBackground: opts.avoidShowingBackground !== false,
                 friction: friction,
+                touchPanSpeedCoeffFactor: touchPanSpeedCoeffFactor
             };
 
             if (typeof opts.minHfov === 'number') {

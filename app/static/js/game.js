@@ -11,7 +11,7 @@ let photoViewerInitialized = false;
 let panoViewer = null;
 const ROUNDS_PER_GAME = 5;
 const DEFAULT_HFOV = 85;
-const MIN_HFOV = 25;
+const MIN_HFOV = 10;
 const MAX_HFOV = 90;
 const TIME_LIMIT = 20;
 let timerInterval = null;
@@ -884,6 +884,9 @@ function loadPanorama(imageUrl) {
         minHfov: MIN_HFOV,
         maxHfov: MAX_HFOV,
         avoidShowingBackground: true,
+        initialYaw: challengeId ? ((challengeId * 137.5) % 360) - 180 : (Math.random() * 360 - 180),        
+        friction: 0.10,
+        touchPanSpeedCoeffFactor: 1.8,
         onReady: function (viewer) { panoViewer = viewer; },
     });
 }

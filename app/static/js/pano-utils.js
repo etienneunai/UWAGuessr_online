@@ -11,7 +11,7 @@
             var minPitch = typeof opts.minPitch === 'number' ? opts.minPitch : (-(vaov / 2));
             var maxPitch = typeof opts.maxPitch === 'number' ? opts.maxPitch : ((vaov / 2));
             var initialPitch = typeof opts.pitch === 'number' ? opts.pitch : 0;
-            var initialYaw = opts.randomizeYaw ? (Math.random() * 360 - 180) : (typeof opts.yaw === 'number' ? opts.yaw : 0);
+            var initialYaw = typeof opts.yaw === 'number' ? opts.yaw : 0;
             var initialHfov = typeof opts.hfov === 'number' ? opts.hfov : 85;
             var friction = typeof opts.friction === 'number' ? opts.friction : 0.15;
             var touchPanSpeedCoeffFactor = typeof opts.touchPanSpeedCoeffFactor === 'number' ? opts.touchPanSpeedCoeffFactor : 1.0;

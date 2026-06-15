@@ -884,7 +884,7 @@ function loadPanorama(imageUrl) {
         minHfov: MIN_HFOV,
         maxHfov: MAX_HFOV,
         avoidShowingBackground: true,
-        randomizeYaw: true,
+        initialYaw: challengeId ? ((challengeId * 137.5) % 360) - 180 : (Math.random() * 360 - 180),        
         friction: 0.10,
         touchPanSpeedCoeffFactor: 1.8,
         onReady: function (viewer) { panoViewer = viewer; },
